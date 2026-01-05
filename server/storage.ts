@@ -1,259 +1,105 @@
-import { type User, type InsertUser, type Memory, type InsertMemory, type Child, type InsertChild } from "@shared/schema";
+import { 
+  type Memory, type InsertMemory, 
+  type Child, type InsertChild,
+  memories, children
+} from "@shared/schema";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
-  
+  // Memories
   getMemories(childId: string): Promise<Memory[]>;
+  getMemoriesByParent(parentId: string): Promise<Memory[]>;
   getMemory(id: string): Promise<Memory | undefined>;
   createMemory(memory: InsertMemory): Promise<Memory>;
+  updateMemory(id: string, refinedNote: string): Promise<Memory | undefined>;
   deleteMemory(id: string): Promise<void>;
   
+  // Children
   getChild(id: string): Promise<Child | undefined>;
+  getChildrenByParent(parentId: string): Promise<Child[]>;
   createChild(child: InsertChild): Promise<Child>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-  private memories: Map<string, Memory>;
-  private children: Map<string, Child>;
-
-  constructor() {
-    this.users = new Map();
-    this.memories = new Map();
-    this.children = new Map();
-    
-    this.seedData();
-  }
-
-  private seedData() {
-    const defaultChildId = "default-child";
-    
-    this.children.set(defaultChildId, {
-      id: defaultChildId,
-      name: "Aiden",
-      birthday: "Aug 15, 2014",
-      viewMode: "device",
-      age: 11,
-    });
-
-    const seedMemories: Memory[] = [
-      {
-        id: "1",
-        type: "voiceMemo",
-        note: "I just want you to know... what you did tonight at the airport—going back to pay for that sandwich—that wasn't a small thing. That's who you are. And I'm so, so proud to be your mom.",
-        date: "Jan 1, 2026",
-        hasPhoto: false,
-        shared: true,
-        from: "Mom",
-        duration: "0:47",
-        transcript: true,
-        source: "",
-        keepsakeType: "",
-        childId: defaultChildId,
-      },
-      {
-        id: "2",
-        type: "moment",
-        note: "You helped your sister without anyone asking. That's the kind of person you are—someone who notices, someone who cares. I see it. I always see it.",
-        date: "March 15, 2024",
-        hasPhoto: false,
-        shared: true,
-        from: "Mom",
-        duration: "",
-        transcript: false,
-        source: "",
-        keepsakeType: "",
-        childId: defaultChildId,
-      },
-      {
-        id: "3",
-        type: "fromOthers",
-        note: "You're the nicest person in our class. Thank you for always saving me a seat at lunch.",
-        date: "Dec 20, 2025",
-        hasPhoto: true,
-        shared: true,
-        from: "Emma (classmate)",
-        duration: "",
-        transcript: false,
-        source: "Birthday card",
-        keepsakeType: "",
-        childId: defaultChildId,
-      },
-      {
-        id: "4",
-        type: "voiceMemo",
-        note: "Happy 11th birthday, buddy. I know I'm not always there as much as I want to be, but I want you to know—every single day, I think about you. I think about the kind of person you're becoming. And it makes me so proud. I love you more than you'll ever know.",
-        date: "Aug 15, 2025",
-        hasPhoto: false,
-        shared: true,
-        from: "Dad",
-        duration: "1:12",
-        transcript: true,
-        source: "",
-        keepsakeType: "",
-        childId: defaultChildId,
-      },
-      {
-        id: "5",
-        type: "fromOthers",
-        note: "Your son has a rare gift—he notices when other kids are struggling and quietly helps them. That kind of empathy can't be taught.",
-        date: "Nov 10, 2025",
-        hasPhoto: false,
-        shared: true,
-        from: "Mrs. Patterson",
-        duration: "",
-        transcript: false,
-        source: "Parent-teacher conference",
-        keepsakeType: "",
-        childId: defaultChildId,
-      },
-      {
-        id: "6",
-        type: "keepsake",
-        note: "Your first drawing of our family. You made sure to include our dog Max with his spot. You were 4.",
-        date: "June 2019",
-        hasPhoto: true,
-        shared: true,
-        from: "Mom",
-        duration: "",
-        transcript: false,
-        source: "",
-        keepsakeType: "First drawing",
-        childId: defaultChildId,
-      },
-      {
-        id: "7",
-        type: "keepsake",
-        note: "Student of the Month for showing kindness and leadership. Your teacher said you helped three new students feel welcome.",
-        date: "Oct 2025",
-        hasPhoto: true,
-        shared: true,
-        from: "Mom",
-        duration: "",
-        transcript: false,
-        source: "",
-        keepsakeType: "Award",
-        childId: defaultChildId,
-      },
-      {
-        id: "8",
-        type: "moment",
-        note: "I watched you stand up for the new kid at school. You didn't know I heard about it. I did. That's who you are.",
-        date: "Dec 15, 2025",
-        hasPhoto: false,
-        shared: true,
-        from: "Mom",
-        duration: "",
-        transcript: false,
-        source: "",
-        keepsakeType: "",
-        childId: defaultChildId,
-      },
-      {
-        id: "9",
-        type: "fromOthers",
-        note: "You're my best friend because you never make fun of anyone and you always share your snacks.",
-        date: "Sept 2025",
-        hasPhoto: false,
-        shared: true,
-        from: "Jake (best friend)",
-        duration: "",
-        transcript: false,
-        source: "Friendship day card",
-        keepsakeType: "",
-        childId: defaultChildId,
-      },
-      {
-        id: "10",
-        type: "voiceMemo",
-        note: "My sweet grandchild... Your mama tells me about all the wonderful things you do. She says you have the biggest heart. I always knew it, from the day you were born. You're going to do great things. Grandma loves you so much.",
-        date: "Dec 25, 2025",
-        hasPhoto: false,
-        shared: true,
-        from: "Grandma",
-        duration: "0:38",
-        transcript: true,
-        source: "",
-        keepsakeType: "",
-        childId: defaultChildId,
-      },
-    ];
-
-    seedMemories.forEach((memory) => {
-      this.memories.set(memory.id, memory);
-    });
-  }
-
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
-  }
-
+export class DatabaseStorage implements IStorage {
+  // Memories
   async getMemories(childId: string): Promise<Memory[]> {
-    return Array.from(this.memories.values())
-      .filter((memory) => memory.childId === childId)
-      .sort((a, b) => {
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
-        return dateB.getTime() - dateA.getTime();
-      });
+    return db
+      .select()
+      .from(memories)
+      .where(eq(memories.childId, childId))
+      .orderBy(desc(memories.createdAt));
+  }
+
+  async getMemoriesByParent(parentId: string): Promise<Memory[]> {
+    return db
+      .select()
+      .from(memories)
+      .where(eq(memories.parentId, parentId))
+      .orderBy(desc(memories.createdAt));
   }
 
   async getMemory(id: string): Promise<Memory | undefined> {
-    return this.memories.get(id);
+    const [memory] = await db.select().from(memories).where(eq(memories.id, id));
+    return memory || undefined;
   }
 
   async createMemory(insertMemory: InsertMemory): Promise<Memory> {
     const id = randomUUID();
-    const memory: Memory = {
-      ...insertMemory,
-      id,
-      hasPhoto: insertMemory.hasPhoto ?? false,
-      shared: insertMemory.shared ?? true,
-      duration: insertMemory.duration ?? "",
-      transcript: insertMemory.transcript ?? false,
-      source: insertMemory.source ?? "",
-      keepsakeType: insertMemory.keepsakeType ?? "",
-    };
-    this.memories.set(id, memory);
+    const [memory] = await db
+      .insert(memories)
+      .values({ 
+        id,
+        type: insertMemory.type,
+        rawNote: insertMemory.rawNote,
+        refinedNote: insertMemory.refinedNote,
+        date: insertMemory.date,
+        mediaUrl: insertMemory.mediaUrl,
+        mediaType: insertMemory.mediaType,
+        shared: insertMemory.shared,
+        from: insertMemory.from,
+        duration: insertMemory.duration,
+        source: insertMemory.source,
+        keepsakeType: insertMemory.keepsakeType,
+        childId: insertMemory.childId,
+        parentId: insertMemory.parentId,
+      })
+      .returning();
     return memory;
   }
 
-  async deleteMemory(id: string): Promise<void> {
-    this.memories.delete(id);
+  async updateMemory(id: string, refinedNote: string): Promise<Memory | undefined> {
+    const [memory] = await db
+      .update(memories)
+      .set({ refinedNote })
+      .where(eq(memories.id, id))
+      .returning();
+    return memory || undefined;
   }
 
+  async deleteMemory(id: string): Promise<void> {
+    await db.delete(memories).where(eq(memories.id, id));
+  }
+
+  // Children
   async getChild(id: string): Promise<Child | undefined> {
-    return this.children.get(id);
+    const [child] = await db.select().from(children).where(eq(children.id, id));
+    return child || undefined;
+  }
+
+  async getChildrenByParent(parentId: string): Promise<Child[]> {
+    return db.select().from(children).where(eq(children.parentId, parentId));
   }
 
   async createChild(insertChild: InsertChild): Promise<Child> {
     const id = randomUUID();
-    const child: Child = {
-      ...insertChild,
-      id,
-      birthday: insertChild.birthday ?? null,
-      viewMode: insertChild.viewMode ?? "device",
-      age: insertChild.age ?? null,
-    };
-    this.children.set(id, child);
+    const [child] = await db
+      .insert(children)
+      .values({ ...insertChild, id })
+      .returning();
     return child;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

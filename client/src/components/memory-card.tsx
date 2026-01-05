@@ -87,7 +87,7 @@ function VoiceMemoPlayer({ memory, isChildView }: { memory: Memory; isChildView?
         Voice memo from {memory.from}
       </div>
 
-      {memory.transcript && (
+      {memory.rawNote && (
         <div className="mt-3">
           <button
             onClick={() => setShowTranscript(!showTranscript)}
@@ -97,12 +97,12 @@ function VoiceMemoPlayer({ memory, isChildView }: { memory: Memory; isChildView?
             {showTranscript ? (
               <>
                 <ChevronUp className="w-4 h-4" />
-                Hide transcript
+                Hide note
               </>
             ) : (
               <>
                 <ChevronDown className="w-4 h-4" />
-                Show transcript
+                Show note
               </>
             )}
           </button>
@@ -112,7 +112,7 @@ function VoiceMemoPlayer({ memory, isChildView }: { memory: Memory; isChildView?
                 isChildView ? "text-base" : "text-[15px]"
               }`}
             >
-              "{memory.note}"
+              "{memory.refinedNote || memory.rawNote}"
             </p>
           )}
         </div>
@@ -149,7 +149,7 @@ export default function MemoryCard({ memory, isChildView = false }: MemoryCardPr
       </div>
 
       <p className={`leading-relaxed italic text-foreground ${isChildView ? "text-lg" : "text-base"}`}>
-        "{memory.note}"
+        "{memory.refinedNote || memory.rawNote}"
       </p>
 
       {memory.keepsakeType && (

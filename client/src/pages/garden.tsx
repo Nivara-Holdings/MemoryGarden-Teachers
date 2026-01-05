@@ -1,13 +1,14 @@
-import { useState } from "react";
-import { useLocation } from "wouter";
+import { useState, useEffect } from "react";
+import { useLocation, useRoute } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import MemoryCard, { FeaturedVoiceMemo } from "@/components/memory-card";
 import AddMemoryDialog from "@/components/add-memory-dialog";
-import { Menu, User, Plus, Sprout, Heart, Mic, MessageCircle, Award } from "lucide-react";
-import type { Memory, InsertMemory } from "@shared/schema";
+import { useAuth } from "@/hooks/use-auth";
+import { Menu, LogOut, Plus, Sprout, Heart, Mic, MessageCircle, Award } from "lucide-react";
+import type { Memory, InsertMemory, Child } from "@shared/schema";
 
 const filterOptions = [
   { key: "all", label: "All", icon: Sprout },
@@ -19,18 +20,31 @@ const filterOptions = [
 
 export default function Garden() {
   const [, navigate] = useLocation();
+  const [, params] = useRoute("/garden/:childId");
   const [activeFilter, setActiveFilter] = useState("all");
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const { user, logout } = useAuth();
 
-  const childName = localStorage.getItem("childName") || "Your Child";
-  const childId = "default-child";
+  const { data: children = [], isLoading: loadingChildren } = useQuery<Child[]>({
+    queryKey: ["/api/children"],
+  });
 
-  const { data: memories = [], isLoading } = useQuery<Memory[]>({
+  const childId = params?.childId || children[0]?.id;
+  const currentChild = children.find(c => c.id === childId);
+
+  useEffect(() => {
+    if (!loadingChildren && children.length === 0) {
+      navigate("/add-child");
+    }
+  }, [loadingChildren, children, navigate]);
+
+  const { data: memories = [], isLoading: loadingMemories } = useQuery<Memory[]>({
     queryKey: ["/api/memories", childId],
+    enabled: !!childId,
   });
 
   const createMemoryMutation = useMutation({
-    mutationFn: async (memory: InsertMemory) => {
+    mutationFn: async (memory: Omit<InsertMemory, "parentId">) => {
       const response = await apiRequest("POST", "/api/memories", memory);
       return response.json();
     },
@@ -45,6 +59,18 @@ export default function Garden() {
       : memories.filter((m) => m.type === activeFilter);
 
   const featuredVoiceMemo = memories.find((m) => m.type === "voiceMemo");
+
+  if (loadingChildren) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Sprout className="w-8 h-8 animate-pulse text-primary" />
+      </div>
+    );
+  }
+
+  if (!childId) {
+    return null;
+  }
 
   return (
     <div
@@ -62,11 +88,11 @@ export default function Garden() {
           <Sprout className="w-5 h-5 text-primary" />
         </div>
         <button
-          onClick={() => navigate("/")}
+          onClick={() => logout()}
           className="text-muted-foreground hover:text-foreground transition-colors"
-          data-testid="button-profile"
+          data-testid="button-logout"
         >
-          <User className="w-6 h-6" />
+          <LogOut className="w-5 h-5" />
         </button>
       </header>
 
@@ -76,10 +102,10 @@ export default function Garden() {
             className="text-2xl font-normal mb-1 tracking-tight"
             data-testid="text-garden-title"
           >
-            {childName}'s Garden
+            {currentChild?.name}'s Garden
           </h1>
           <p className="text-muted-foreground text-sm">
-            Age 11 • {memories.length} memories
+            {currentChild?.age ? `Age ${currentChild.age} • ` : ""}{memories.length} memories
           </p>
         </div>
 
@@ -105,7 +131,7 @@ export default function Garden() {
           })}
         </div>
 
-        {isLoading ? (
+        {loadingMemories ? (
           <div className="space-y-4">
             <Skeleton className="h-40 rounded-2xl" />
             <Skeleton className="h-32 rounded-2xl" />

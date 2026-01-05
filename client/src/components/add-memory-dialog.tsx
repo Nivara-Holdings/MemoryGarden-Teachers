@@ -16,7 +16,7 @@ import type { MemoryType, InsertMemory } from "@shared/schema";
 interface AddMemoryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (memory: InsertMemory) => void;
+  onSubmit: (memory: Omit<InsertMemory, "parentId">) => void;
   childId: string;
 }
 
@@ -95,17 +95,15 @@ export default function AddMemoryDialog({
       year: "numeric",
     });
 
-    const memory: InsertMemory = {
+    const memory: Omit<InsertMemory, "parentId"> = {
       type: selectedType,
-      note,
+      rawNote: note,
       date: dateStr,
-      hasPhoto: false,
       shared: true,
       from,
       childId,
       ...(selectedType === "voiceMemo" && {
         duration: `${Math.floor(recordingTime / 60)}:${String(recordingTime % 60).padStart(2, "0")}`,
-        transcript: true,
       }),
       ...(selectedType === "fromOthers" && { source }),
       ...(selectedType === "keepsake" && { keepsakeType }),
