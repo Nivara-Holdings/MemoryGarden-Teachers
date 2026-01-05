@@ -323,7 +323,7 @@ export default function AddMemoryDialog({
                     />
                   </div>
 
-                  {note.trim() && selectedType === "moment" && (
+                  {note.trim() && (
                     <div className="space-y-3">
                       <Button
                         type="button"
