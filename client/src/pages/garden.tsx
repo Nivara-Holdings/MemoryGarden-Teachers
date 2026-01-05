@@ -140,7 +140,9 @@ export default function Garden() {
         ) : (
           <>
             {activeFilter === "all" && featuredVoiceMemo && (
-              <FeaturedVoiceMemo memory={featuredVoiceMemo} />
+              <div className="mb-4">
+                <FeaturedVoiceMemo memory={featuredVoiceMemo} />
+              </div>
             )}
 
             {filteredMemories.length === 0 ? (
@@ -161,7 +163,7 @@ export default function Garden() {
                 </Button>
               </div>
             ) : (
-              <div className="space-y-0">
+              <div className="space-y-4">
                 {filteredMemories
                   .filter((m) =>
                     activeFilter === "all" && featuredVoiceMemo

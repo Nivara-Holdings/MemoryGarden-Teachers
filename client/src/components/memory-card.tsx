@@ -127,7 +127,7 @@ export default function MemoryCard({ memory, isChildView = false }: MemoryCardPr
 
   if (memory.type === "voiceMemo") {
     return (
-      <div className="mb-4" data-testid={`card-memory-${memory.id}`}>
+      <div data-testid={`card-memory-${memory.id}`}>
         <VoiceMemoPlayer memory={memory} isChildView={isChildView} />
       </div>
     );
@@ -135,7 +135,7 @@ export default function MemoryCard({ memory, isChildView = false }: MemoryCardPr
 
   return (
     <Card
-      className={`${config.bgClass} border ${config.borderClass} p-5 mb-4`}
+      className={`${config.bgClass} border ${config.borderClass} p-5`}
       data-testid={`card-memory-${memory.id}`}
     >
       <div className={`flex items-center gap-2 text-sm font-medium ${config.accentClass} mb-3`}>
@@ -180,7 +180,7 @@ export default function MemoryCard({ memory, isChildView = false }: MemoryCardPr
 export function FeaturedVoiceMemo({ memory }: { memory: Memory }) {
   return (
     <Card
-      className="bg-[hsl(var(--coral))] border border-[hsl(var(--coral-dark)/0.5)] overflow-hidden mb-4"
+      className="bg-[hsl(var(--coral))] border border-[hsl(var(--coral-dark)/0.5)] overflow-hidden"
       data-testid="card-featured-voice"
     >
       <div className="absolute top-3 right-3 text-xs text-[hsl(var(--coral-dark))] bg-white px-3 py-1 rounded-full z-10">
