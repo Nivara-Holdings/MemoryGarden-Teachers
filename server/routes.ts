@@ -162,5 +162,50 @@ export async function registerRoutes(
     }
   });
 
+  // Register object storage routes
+  registerObjectStorageRoutes(app);
+
+  // Note refinement endpoint using OpenAI
+  app.post("/api/refine-note", isAuthenticated, async (req: any, res) => {
+    try {
+      const { rawNote, childName } = req.body;
+      
+      if (!rawNote) {
+        return res.status(400).json({ error: "Raw note is required" });
+      }
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are helping a parent write a heartfelt message for their child${childName ? ` named ${childName}` : ''}. 
+Polish their raw notes into a warm, meaningful message that preserves their original sentiment and voice. 
+Keep the message personal and intimate - this is for a memory garden that the child will read someday.
+Don't add new content, just refine and elevate what they wrote. Keep it concise (2-4 sentences).
+Write in first person as the parent speaking to the child.`
+          },
+          {
+            role: "user",
+            content: rawNote
+          }
+        ],
+        max_tokens: 300,
+      });
+
+      const refinedNote = response.choices[0]?.message?.content || rawNote;
+      res.json({ refinedNote });
+    } catch (error) {
+      console.error("Error refining note:", error);
+      res.status(500).json({ error: "Failed to refine note" });
+    }
+  });
+
   return httpServer;
 }

@@ -195,6 +195,7 @@ export default function Garden() {
         onOpenChange={setShowAddDialog}
         onSubmit={(memory) => createMemoryMutation.mutate(memory)}
         childId={childId}
+        childName={currentChild?.name}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Heart, Mic, MessageCircle, Award, Sparkles, X } from "lucide-react";
+import { Heart, Mic, MessageCircle, Award, Sparkles, X, Image, Loader2 } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 import type { MemoryType, InsertMemory } from "@shared/schema";
 
 interface AddMemoryDialogProps {
@@ -18,6 +19,7 @@ interface AddMemoryDialogProps {
   onOpenChange: (open: boolean) => void;
   onSubmit: (memory: Omit<InsertMemory, "parentId">) => void;
   childId: string;
+  childName?: string;
 }
 
 const memoryTypeOptions = [
@@ -55,36 +57,93 @@ const memoryTypeOptions = [
   },
 ];
 
-const llmSuggestions = [
-  "You remembered what I did two years ago. And tonight, you became that person yourself. I'm so proud.",
-  "Integrity isn't taught. It's caught. You caught it. I saw it tonight.",
-  "The sandwich didn't matter. Who you are does. And tonight, you showed me who you are.",
-];
-
 export default function AddMemoryDialog({
   open,
   onOpenChange,
   onSubmit,
   childId,
+  childName,
 }: AddMemoryDialogProps) {
   const [step, setStep] = useState<"type" | "content">("type");
   const [selectedType, setSelectedType] = useState<MemoryType>("moment");
   const [note, setNote] = useState("");
+  const [refinedNote, setRefinedNote] = useState("");
   const [from, setFrom] = useState("Mom");
   const [source, setSource] = useState("");
   const [keepsakeType, setKeepsakeType] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [isPolishing, setIsPolishing] = useState(false);
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
+  const [mediaType, setMediaType] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const resetState = () => {
     setStep("type");
     setSelectedType("moment");
     setNote("");
+    setRefinedNote("");
     setFrom("Mom");
     setSource("");
     setKeepsakeType("");
     setIsRecording(false);
     setRecordingTime(0);
+    setMediaUrl(null);
+    setMediaType(null);
+  };
+
+  const handlePolishNote = async () => {
+    if (!note.trim()) return;
+    
+    setIsPolishing(true);
+    try {
+      const response = await apiRequest("POST", "/api/refine-note", {
+        rawNote: note,
+        childName,
+      });
+      const data = await response.json();
+      setRefinedNote(data.refinedNote);
+    } catch (error) {
+      console.error("Failed to polish note:", error);
+    } finally {
+      setIsPolishing(false);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const urlResponse = await fetch("/api/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: file.name,
+          size: file.size,
+          contentType: file.type,
+        }),
+      });
+      
+      if (!urlResponse.ok) throw new Error("Failed to get upload URL");
+      
+      const { uploadURL, objectPath } = await urlResponse.json();
+      
+      await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+      
+      setMediaUrl(objectPath);
+      setMediaType(file.type.startsWith("image/") ? "image" : file.type.startsWith("audio/") ? "audio" : "file");
+    } catch (error) {
+      console.error("Upload failed:", error);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleSubmit = () => {
@@ -98,10 +157,13 @@ export default function AddMemoryDialog({
     const memory: Omit<InsertMemory, "parentId"> = {
       type: selectedType,
       rawNote: note,
+      refinedNote: refinedNote || null,
       date: dateStr,
       shared: true,
       from,
       childId,
+      mediaUrl,
+      mediaType,
       ...(selectedType === "voiceMemo" && {
         duration: `${Math.floor(recordingTime / 60)}:${String(recordingTime % 60).padStart(2, "0")}`,
       }),
@@ -195,9 +257,15 @@ export default function AddMemoryDialog({
                         setIsRecording(!isRecording);
                         if (!isRecording) {
                           const interval = setInterval(() => {
-                            setRecordingTime((t) => t + 1);
+                            setRecordingTime((t) => {
+                              if (t >= 60) {
+                                clearInterval(interval);
+                                setIsRecording(false);
+                                return t;
+                              }
+                              return t + 1;
+                            });
                           }, 1000);
-                          setTimeout(() => clearInterval(interval), 60000);
                         }
                       }}
                       className={`w-20 h-20 rounded-full flex items-center justify-center transition-all ${
@@ -215,14 +283,14 @@ export default function AddMemoryDialog({
                     {recordingTime > 0 && (
                       <p className="text-muted-foreground">
                         {Math.floor(recordingTime / 60)}:
-                        {String(recordingTime % 60).padStart(2, "0")}
+                        {String(recordingTime % 60).padStart(2, "0")} / 1:00
                       </p>
                     )}
                   </div>
 
                   <div className="space-y-2">
                     <Label className="text-muted-foreground text-sm">
-                      Transcript (optional)
+                      Note (optional)
                     </Label>
                     <Textarea
                       placeholder="What did you say?"
@@ -246,32 +314,95 @@ export default function AddMemoryDialog({
                     <Textarea
                       placeholder="Write your memory here..."
                       value={note}
-                      onChange={(e) => setNote(e.target.value)}
+                      onChange={(e) => {
+                        setNote(e.target.value);
+                        setRefinedNote("");
+                      }}
                       className="min-h-[120px] text-base rounded-xl"
                       data-testid="textarea-note"
                     />
                   </div>
 
-                  {selectedType === "moment" && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Sparkles className="w-4 h-4" />
-                        AI suggestions
-                      </div>
-                      <div className="space-y-2">
-                        {llmSuggestions.map((suggestion, i) => (
-                          <button
-                            key={i}
-                            onClick={() => setNote(suggestion)}
-                            className="w-full text-left p-3 rounded-xl bg-muted/50 text-sm hover:bg-muted transition-colors"
-                            data-testid={`suggestion-${i}`}
+                  {note.trim() && selectedType === "moment" && (
+                    <div className="space-y-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handlePolishNote}
+                        disabled={isPolishing}
+                        className="w-full rounded-xl"
+                        data-testid="button-polish"
+                      >
+                        {isPolishing ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Polishing...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-4 h-4 mr-2" />
+                            Polish my words
+                          </>
+                        )}
+                      </Button>
+                      
+                      {refinedNote && (
+                        <div className="p-4 rounded-xl bg-[hsl(var(--sage-light))] border border-primary/20">
+                          <p className="text-sm text-muted-foreground mb-2">Polished version:</p>
+                          <p className="italic text-foreground">"{refinedNote}"</p>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setNote(refinedNote);
+                              setRefinedNote("");
+                            }}
+                            className="mt-2"
+                            data-testid="button-use-polished"
                           >
-                            "{suggestion}"
-                          </button>
-                        ))}
-                      </div>
+                            Use this version
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   )}
+
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground text-sm">
+                      Add a photo (optional)
+                    </Label>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                      data-testid="input-file"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      className="w-full rounded-xl"
+                      data-testid="button-upload-photo"
+                    >
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : mediaUrl ? (
+                        "Photo attached"
+                      ) : (
+                        <>
+                          <Image className="w-4 h-4 mr-2" />
+                          Choose photo
+                        </>
+                      )}
+                    </Button>
+                  </div>
 
                   {selectedType === "fromOthers" && (
                     <>
