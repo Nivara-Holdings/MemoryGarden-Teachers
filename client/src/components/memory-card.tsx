@@ -148,6 +148,17 @@ export default function MemoryCard({ memory, isChildView = false }: MemoryCardPr
         )}
       </div>
 
+      {memory.mediaUrl && memory.mediaType === "image" && (
+        <div className="mb-4 rounded-xl overflow-hidden">
+          <img
+            src={memory.mediaUrl}
+            alt="Memory photo"
+            className="w-full h-auto object-cover"
+            data-testid={`img-memory-${memory.id}`}
+          />
+        </div>
+      )}
+
       <p className={`leading-relaxed italic text-foreground ${isChildView ? "text-lg" : "text-base"}`}>
         "{memory.refinedNote || memory.rawNote}"
       </p>
