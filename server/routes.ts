@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { insertMemorySchema, insertChildSchema } from "@shared/schema";
 import { z } from "zod";
 import { isAuthenticated } from "./replit_integrations/auth";
+import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 
 export async function registerRoutes(
   httpServer: Server,
