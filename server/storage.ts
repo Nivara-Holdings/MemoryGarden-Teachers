@@ -13,7 +13,7 @@ export interface IStorage {
   getMemoriesByParent(parentId: string): Promise<Memory[]>;
   getMemory(id: string): Promise<Memory | undefined>;
   createMemory(memory: InsertMemory): Promise<Memory>;
-  updateMemory(id: string, refinedNote: string): Promise<Memory | undefined>;
+  updateMemory(id: string, updates: Partial<InsertMemory>): Promise<Memory | undefined>;
   deleteMemory(id: string): Promise<void>;
   
   // Children
@@ -69,10 +69,10 @@ export class DatabaseStorage implements IStorage {
     return memory;
   }
 
-  async updateMemory(id: string, refinedNote: string): Promise<Memory | undefined> {
+  async updateMemory(id: string, updates: Partial<InsertMemory>): Promise<Memory | undefined> {
     const [memory] = await db
       .update(memories)
-      .set({ refinedNote })
+      .set(updates)
       .where(eq(memories.id, id))
       .returning();
     return memory || undefined;

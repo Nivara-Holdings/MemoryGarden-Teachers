@@ -4,8 +4,19 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import MemoryCard, { FeaturedVoiceMemo } from "@/components/memory-card";
 import AddMemoryDialog from "@/components/add-memory-dialog";
+import EditMemoryDialog from "@/components/edit-memory-dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { Menu, LogOut, Plus, Sprout, Heart, Mic, MessageCircle, Award } from "lucide-react";
 import type { Memory, InsertMemory, Child } from "@shared/schema";
@@ -23,6 +34,8 @@ export default function Garden() {
   const [, params] = useRoute("/garden/:childId");
   const [activeFilter, setActiveFilter] = useState("all");
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [editingMemory, setEditingMemory] = useState<Memory | null>(null);
+  const [deletingMemoryId, setDeletingMemoryId] = useState<string | null>(null);
   const { user, logout } = useAuth();
 
   const { data: children = [], isLoading: loadingChildren } = useQuery<Child[]>({
@@ -52,6 +65,45 @@ export default function Garden() {
       queryClient.invalidateQueries({ queryKey: ["/api/memories", childId] });
     },
   });
+
+  const updateMemoryMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<InsertMemory> }) => {
+      const response = await apiRequest("PATCH", `/api/memories/${id}`, updates);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/memories", childId] });
+      setEditingMemory(null);
+    },
+  });
+
+  const deleteMemoryMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/memories/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/memories", childId] });
+      setDeletingMemoryId(null);
+    },
+  });
+
+  const handleEdit = (memory: Memory) => {
+    setEditingMemory(memory);
+  };
+
+  const handleDelete = (memoryId: string) => {
+    setDeletingMemoryId(memoryId);
+  };
+
+  const handleTogglePrivacy = (memoryId: string, shared: boolean) => {
+    updateMemoryMutation.mutate({ id: memoryId, updates: { shared } });
+  };
+
+  const confirmDelete = () => {
+    if (deletingMemoryId) {
+      deleteMemoryMutation.mutate(deletingMemoryId);
+    }
+  };
 
   const filteredMemories =
     activeFilter === "all"
@@ -171,7 +223,13 @@ export default function Garden() {
                       : true
                   )
                   .map((memory) => (
-                    <MemoryCard key={memory.id} memory={memory} />
+                    <MemoryCard
+                      key={memory.id}
+                      memory={memory}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      onTogglePrivacy={handleTogglePrivacy}
+                    />
                   ))}
               </div>
             )}
@@ -199,6 +257,35 @@ export default function Garden() {
         childId={childId}
         childName={currentChild?.name}
       />
+
+      <EditMemoryDialog
+        memory={editingMemory}
+        open={!!editingMemory}
+        onOpenChange={(open) => !open && setEditingMemory(null)}
+        onSave={(id, updates) => updateMemoryMutation.mutate({ id, updates })}
+        isSaving={updateMemoryMutation.isPending}
+      />
+
+      <AlertDialog open={!!deletingMemoryId} onOpenChange={(open) => !open && setDeletingMemoryId(null)}>
+        <AlertDialogContent className="max-w-[350px] rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this memory?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This memory will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

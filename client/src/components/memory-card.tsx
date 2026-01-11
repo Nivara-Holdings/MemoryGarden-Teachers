@@ -1,11 +1,15 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Heart, MessageCircle, Award, Mic, Play, Pause, ChevronDown, ChevronUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Heart, MessageCircle, Award, Mic, Play, Pause, ChevronDown, ChevronUp, Pencil, Trash2, Lock, Unlock } from "lucide-react";
 import type { Memory } from "@shared/schema";
 
 interface MemoryCardProps {
   memory: Memory;
   isChildView?: boolean;
+  onEdit?: (memory: Memory) => void;
+  onDelete?: (memoryId: string) => void;
+  onTogglePrivacy?: (memoryId: string, shared: boolean) => void;
 }
 
 const memoryTypeConfig = {
@@ -121,23 +125,72 @@ function VoiceMemoPlayer({ memory, isChildView }: { memory: Memory; isChildView?
   );
 }
 
-export default function MemoryCard({ memory, isChildView = false }: MemoryCardProps) {
+export default function MemoryCard({ memory, isChildView = false, onEdit, onDelete, onTogglePrivacy }: MemoryCardProps) {
   const config = memoryTypeConfig[memory.type] || memoryTypeConfig.moment;
   const Icon = config.icon;
+  const showActions = !isChildView && (onEdit || onDelete || onTogglePrivacy);
 
   if (memory.type === "voiceMemo") {
     return (
-      <div data-testid={`card-memory-${memory.id}`}>
+      <div data-testid={`card-memory-${memory.id}`} className="relative">
+        {!memory.shared && (
+          <div className="absolute top-3 right-3 z-10">
+            <Lock className="w-4 h-4 text-muted-foreground" />
+          </div>
+        )}
         <VoiceMemoPlayer memory={memory} isChildView={isChildView} />
+        {showActions && (
+          <div className="flex items-center justify-end gap-1 mt-2">
+            {onTogglePrivacy && (
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => onTogglePrivacy(memory.id, !memory.shared)}
+                className="h-8 w-8"
+                data-testid={`button-privacy-${memory.id}`}
+              >
+                {memory.shared ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+              </Button>
+            )}
+            {onEdit && (
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => onEdit(memory)}
+                className="h-8 w-8"
+                data-testid={`button-edit-${memory.id}`}
+              >
+                <Pencil className="w-4 h-4" />
+              </Button>
+            )}
+            {onDelete && (
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => onDelete(memory.id)}
+                className="h-8 w-8 text-destructive hover:text-destructive"
+                data-testid={`button-delete-${memory.id}`}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+        )}
       </div>
     );
   }
 
   return (
     <Card
-      className={`${config.bgClass} border ${config.borderClass} p-5`}
+      className={`${config.bgClass} border ${config.borderClass} p-5 relative`}
       data-testid={`card-memory-${memory.id}`}
     >
+      {!memory.shared && (
+        <div className="absolute top-3 right-3">
+          <Lock className="w-4 h-4 text-muted-foreground" />
+        </div>
+      )}
+      
       <div className={`flex items-center gap-2 text-sm font-medium ${config.accentClass} mb-3`}>
         <Icon className="w-4 h-4" />
         {memory.type === "fromOthers" ? `From ${memory.from}` : config.label}
@@ -171,7 +224,47 @@ export default function MemoryCard({ memory, isChildView = false }: MemoryCardPr
 
       <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/50">
         <span className="text-sm text-muted-foreground">{memory.date}</span>
-        <span className="text-sm text-muted-foreground">From {memory.from}</span>
+        <div className="flex items-center gap-1">
+          {showActions ? (
+            <>
+              {onTogglePrivacy && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => onTogglePrivacy(memory.id, !memory.shared)}
+                  className="h-8 w-8"
+                  data-testid={`button-privacy-${memory.id}`}
+                >
+                  {memory.shared ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                </Button>
+              )}
+              {onEdit && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => onEdit(memory)}
+                  className="h-8 w-8"
+                  data-testid={`button-edit-${memory.id}`}
+                >
+                  <Pencil className="w-4 h-4" />
+                </Button>
+              )}
+              {onDelete && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => onDelete(memory.id)}
+                  className="h-8 w-8 text-destructive hover:text-destructive"
+                  data-testid={`button-delete-${memory.id}`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              )}
+            </>
+          ) : (
+            <span className="text-sm text-muted-foreground">From {memory.from}</span>
+          )}
+        </div>
       </div>
     </Card>
   );

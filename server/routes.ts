@@ -70,6 +70,37 @@ export async function registerRoutes(
     }
   });
 
+  // Update memory (authenticated)
+  app.patch("/api/memories/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const parentId = req.user?.claims?.sub;
+      
+      const memory = await storage.getMemory(id);
+      if (!memory) {
+        return res.status(404).json({ error: "Memory not found" });
+      }
+      if (memory.parentId !== parentId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      // Only allow specific fields to be updated (security: prevent changing parentId/childId)
+      const allowedFields = ['rawNote', 'refinedNote', 'shared', 'from', 'source', 'keepsakeType', 'date'] as const;
+      const updates: Record<string, any> = {};
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          updates[field] = req.body[field];
+        }
+      }
+      
+      const updatedMemory = await storage.updateMemory(id, updates);
+      res.json(updatedMemory);
+    } catch (error) {
+      console.error("Error updating memory:", error);
+      res.status(500).json({ error: "Failed to update memory" });
+    }
+  });
+
   // Delete memory (authenticated)
   app.delete("/api/memories/:id", isAuthenticated, async (req: any, res) => {
     try {
