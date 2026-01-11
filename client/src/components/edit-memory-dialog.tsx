@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { X, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import type { Memory } from "@shared/schema";
 
 interface EditMemoryDialogProps {
@@ -42,25 +42,18 @@ export default function EditMemoryDialog({
     });
   };
 
+  if (!memory) return null;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[400px] p-0 gap-0 rounded-2xl overflow-hidden">
-        <DialogHeader className="px-6 py-5 border-b border-border">
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-lg flex-1 text-center" data-testid="text-edit-dialog-title">
-              Edit Memory
-            </DialogTitle>
-            <button
-              onClick={() => onOpenChange(false)}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-              data-testid="button-close-edit-dialog"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+      <DialogContent className="max-w-[400px] rounded-2xl">
+        <DialogHeader>
+          <DialogTitle className="text-lg" data-testid="text-edit-dialog-title">
+            Edit Memory
+          </DialogTitle>
         </DialogHeader>
 
-        <div className="p-6 space-y-5">
+        <div className="space-y-5">
           <div className="space-y-2">
             <Label className="text-muted-foreground text-sm">
               Your memory
