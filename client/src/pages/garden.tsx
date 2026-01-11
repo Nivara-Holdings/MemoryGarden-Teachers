@@ -264,6 +264,7 @@ export default function Garden() {
         onOpenChange={(open) => !open && setEditingMemory(null)}
         onSave={(id, updates) => updateMemoryMutation.mutate({ id, updates })}
         isSaving={updateMemoryMutation.isPending}
+        childName={currentChild?.name}
       />
 
       <AlertDialog open={!!deletingMemoryId} onOpenChange={(open) => !open && setDeletingMemoryId(null)}>
