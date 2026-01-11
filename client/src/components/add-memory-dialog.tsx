@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Heart, Mic, MessageCircle, Award, Sparkles, X, Image, Loader2 } from "lucide-react";
+import { Heart, Mic, MessageCircle, Award, Sparkles, X, Image, Loader2, Calendar } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { MemoryType, InsertMemory } from "@shared/schema";
 
@@ -77,6 +77,7 @@ export default function AddMemoryDialog({
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [memoryDate, setMemoryDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const resetState = () => {
@@ -91,6 +92,7 @@ export default function AddMemoryDialog({
     setRecordingTime(0);
     setMediaUrl(null);
     setMediaType(null);
+    setMemoryDate(new Date().toISOString().split('T')[0]);
   };
 
   const handlePolishNote = async () => {
@@ -147,8 +149,8 @@ export default function AddMemoryDialog({
   };
 
   const handleSubmit = () => {
-    const today = new Date();
-    const dateStr = today.toLocaleDateString("en-US", {
+    const selectedDate = new Date(memoryDate + 'T00:00:00');
+    const dateStr = selectedDate.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -300,6 +302,23 @@ export default function AddMemoryDialog({
                       data-testid="textarea-transcript"
                     />
                   </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground text-sm">
+                      When did this happen?
+                    </Label>
+                    <div className="relative">
+                      <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                      <Input
+                        type="date"
+                        value={memoryDate}
+                        onChange={(e) => setMemoryDate(e.target.value)}
+                        max={new Date().toISOString().split('T')[0]}
+                        className="pl-10 py-3 text-base rounded-xl"
+                        data-testid="input-date-voice"
+                      />
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <>
@@ -402,6 +421,23 @@ export default function AddMemoryDialog({
                         </>
                       )}
                     </Button>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground text-sm">
+                      When did this happen?
+                    </Label>
+                    <div className="relative">
+                      <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                      <Input
+                        type="date"
+                        value={memoryDate}
+                        onChange={(e) => setMemoryDate(e.target.value)}
+                        max={new Date().toISOString().split('T')[0]}
+                        className="pl-10 py-3 text-base rounded-xl"
+                        data-testid="input-date"
+                      />
+                    </div>
                   </div>
 
                   {selectedType === "fromOthers" && (
