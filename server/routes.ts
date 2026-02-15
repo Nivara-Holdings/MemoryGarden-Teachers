@@ -15,7 +15,7 @@ export async function registerRoutes(
 ): Promise<Server> {
 
   // ---- Local File Upload ----
-  const uploadsDir = path.join(process.cwd(), "uploads");
+  const uploadsDir = process.env.UPLOADS_DIR || (process.env.NODE_ENV === "production" ? "/app/uploads" : path.join(process.cwd(), "uploads"));
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
@@ -341,7 +341,6 @@ GUARDRAILS:
       }
 
       // Read images from disk, resize if needed, and convert to base64
-      const uploadsDir = path.join(process.cwd(), "uploads");
       const imageContent: any[] = [];
 
       for (const url of imagesToRead) {
