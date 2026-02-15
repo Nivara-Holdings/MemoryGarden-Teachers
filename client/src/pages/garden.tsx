@@ -14,19 +14,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import MemoryCard, { FeaturedVoiceMemo } from "@/components/memory-card";
+import MemoryCard from "@/components/memory-card";
 import AddMemoryDialog from "@/components/add-memory-dialog";
 import EditMemoryDialog from "@/components/edit-memory-dialog";
+import StoryViewer from "@/components/story-viewer";
 import { useAuth } from "@/hooks/use-auth";
-import { Menu, LogOut, Plus, Sprout, Heart, Mic, MessageCircle, Award } from "lucide-react";
+import { Menu, LogOut, Plus, Sprout } from "lucide-react";
 import type { Memory, InsertMemory, Child } from "@shared/schema";
 
 const filterOptions = [
-  { key: "all", label: "All", icon: Sprout },
-  { key: "moment", label: "Moments", icon: Heart },
-  { key: "voiceMemo", label: "Voice", icon: Mic },
-  { key: "fromOthers", label: "Others", icon: MessageCircle },
-  { key: "keepsake", label: "Keepsakes", icon: Award },
+  { key: "all", label: "All", emoji: "🌿" },
+  { key: "moment", label: "Moment", emoji: "💛" },
+  { key: "first", label: "First", emoji: "⭐" },
+  { key: "growth", label: "Growth", emoji: "🌱" },
+  { key: "keepsake", label: "Keepsake", emoji: "🎨" },
 ];
 
 export default function Garden() {
@@ -36,6 +37,8 @@ export default function Garden() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingMemory, setEditingMemory] = useState<Memory | null>(null);
   const [deletingMemoryId, setDeletingMemoryId] = useState<string | null>(null);
+  const [storyData, setStoryData] = useState<{ memories: Memory[]; monthLabel: string; summary?: string } | null>(null);
+  const [generatingSummary, setGeneratingSummary] = useState<string | null>(null);
   const { user, logout } = useAuth();
 
   const { data: children = [], isLoading: loadingChildren } = useQuery<Child[]>({
@@ -47,7 +50,7 @@ export default function Garden() {
 
   useEffect(() => {
     if (!loadingChildren && children.length === 0) {
-      navigate("/add-child");
+      navigate("/");
     }
   }, [loadingChildren, children, navigate]);
 
@@ -108,9 +111,76 @@ export default function Garden() {
   const filteredMemories =
     activeFilter === "all"
       ? memories
-      : memories.filter((m) => m.type === activeFilter);
+      : memories.filter((m) => m.source?.toLowerCase().includes(activeFilter));
 
-  const featuredVoiceMemo = memories.find((m) => m.type === "voiceMemo");
+  // Group memories by month
+  const groupedMemories = (() => {
+    const memoriesToGroup = filteredMemories;
+    
+    const groups: { label: string; sortKey: string; memories: typeof memoriesToGroup }[] = [];
+    const groupMap = new Map<string, typeof memoriesToGroup>();
+    
+    for (const memory of memoriesToGroup) {
+      // Parse the date string (format: "Feb 12, 2026" or similar)
+      const parsed = new Date(memory.date || memory.createdAt || "");
+      let label: string;
+      let sortKey: string;
+      
+      if (!isNaN(parsed.getTime())) {
+        label = parsed.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+        sortKey = `${parsed.getFullYear()}-${String(parsed.getMonth()).padStart(2, "0")}`;
+      } else {
+        label = "Other";
+        sortKey = "0000-00";
+      }
+      
+      if (!groupMap.has(sortKey)) {
+        groupMap.set(sortKey, []);
+        groups.push({ label, sortKey, memories: groupMap.get(sortKey)! });
+      }
+      groupMap.get(sortKey)!.push(memory);
+    }
+    
+    // Sort groups newest first
+    groups.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+    return groups;
+  })();
+
+  // Garden stats
+  const firstMemoryDate = memories.length > 0
+    ? memories[memories.length - 1]?.date || ""
+    : "";
+
+  const openStory = async (group: { label: string; sortKey: string; memories: Memory[] }) => {
+    if (group.memories.length < 3) {
+      setStoryData({ memories: group.memories, monthLabel: group.label });
+      return;
+    }
+    // Generate summary with Claude
+    setGeneratingSummary(group.sortKey);
+    try {
+      const notes = group.memories.map(m => m.refinedNote || m.rawNote).filter(Boolean).join(". ");
+      const res = await apiRequest("POST", "/api/generate-story", {
+        notes,
+        childName: currentChild?.name,
+        monthLabel: group.label,
+      });
+      const data = await res.json();
+      setStoryData({ memories: group.memories, monthLabel: group.label, summary: data.summary });
+    } catch (err) {
+      setStoryData({ memories: group.memories, monthLabel: group.label });
+    } finally {
+      setGeneratingSummary(null);
+    }
+  };
+  const daysSinceLastMemory = memories.length > 0
+    ? (() => {
+        const last = new Date(memories[0]?.createdAt || "");
+        if (isNaN(last.getTime())) return null;
+        const diff = Math.floor((Date.now() - last.getTime()) / (1000 * 60 * 60 * 24));
+        return diff;
+      })()
+    : null;
 
   if (loadingChildren) {
     return (
@@ -131,6 +201,7 @@ export default function Garden() {
     >
       <header className="flex items-center justify-between gap-4 px-6 py-5 border-b border-border sticky top-0 bg-background z-50">
         <button
+          onClick={() => navigate("/")}
           className="text-muted-foreground hover:text-foreground transition-colors"
           data-testid="button-menu"
         >
@@ -157,26 +228,29 @@ export default function Garden() {
             {currentChild?.name}'s Garden
           </h1>
           <p className="text-muted-foreground text-sm">
-            {currentChild?.age ? `Age ${currentChild.age} • ` : ""}{memories.length} memories
+            {memories.length} {memories.length === 1 ? "memory" : "memories"}
+            {firstMemoryDate ? ` · Since ${firstMemoryDate}` : ""}
+            {daysSinceLastMemory !== null && daysSinceLastMemory > 0 
+              ? ` · Last added ${daysSinceLastMemory === 1 ? "yesterday" : `${daysSinceLastMemory} days ago`}` 
+              : daysSinceLastMemory === 0 ? " · Added today" : ""}
           </p>
         </div>
 
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide">
           {filterOptions.map((filter) => {
-            const Icon = filter.icon;
             const isActive = activeFilter === filter.key;
             return (
               <button
                 key={filter.key}
                 onClick={() => setActiveFilter(filter.key)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-sm whitespace-nowrap transition-all ${
+                className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full text-sm whitespace-nowrap transition-all ${
                   isActive
                     ? "bg-primary text-primary-foreground"
                     : "bg-card text-foreground shadow-sm hover:bg-muted"
                 }`}
                 data-testid={`filter-${filter.key}`}
               >
-                <Icon className="w-4 h-4" />
+                <span>{filter.emoji}</span>
                 {filter.label}
               </button>
             );
@@ -191,12 +265,6 @@ export default function Garden() {
           </div>
         ) : (
           <>
-            {activeFilter === "all" && featuredVoiceMemo && (
-              <div className="mb-4">
-                <FeaturedVoiceMemo memory={featuredVoiceMemo} />
-              </div>
-            )}
-
             {filteredMemories.length === 0 ? (
               <div className="text-center py-16">
                 <div className="w-16 h-16 rounded-full bg-muted mx-auto flex items-center justify-center mb-4">
@@ -215,22 +283,29 @@ export default function Garden() {
                 </Button>
               </div>
             ) : (
-              <div className="space-y-4">
-                {filteredMemories
-                  .filter((m) =>
-                    activeFilter === "all" && featuredVoiceMemo
-                      ? m.id !== featuredVoiceMemo.id
-                      : true
-                  )
-                  .map((memory) => (
-                    <MemoryCard
-                      key={memory.id}
-                      memory={memory}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
-                      onTogglePrivacy={handleTogglePrivacy}
-                    />
-                  ))}
+              <div className="space-y-6">
+                {groupedMemories.map((group) => (
+                  <div key={group.sortKey}>
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-2 h-2 rounded-full bg-primary" />
+                      <h2 className="text-sm font-medium text-muted-foreground tracking-wide">
+                        {group.label}
+                      </h2>
+                      <div className="flex-1 h-px bg-border" />
+                    </div>
+                    <div className="space-y-4 pl-5 border-l-2 border-border/50 ml-[3px]">
+                      {group.memories.map((memory) => (
+                        <MemoryCard
+                          key={memory.id}
+                          memory={memory}
+                          onEdit={handleEdit}
+                          onDelete={handleDelete}
+                          onTogglePrivacy={handleTogglePrivacy}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </>
@@ -256,6 +331,7 @@ export default function Garden() {
         onSubmit={(memory) => createMemoryMutation.mutate(memory)}
         childId={childId}
         childName={currentChild?.name}
+        childNickname={(currentChild as any)?.nickname}
       />
 
       <EditMemoryDialog
@@ -287,6 +363,16 @@ export default function Garden() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {storyData && (
+        <StoryViewer
+          memories={storyData.memories}
+          monthLabel={storyData.monthLabel}
+          childName={currentChild?.name || ""}
+          summary={storyData.summary}
+          onClose={() => setStoryData(null)}
+        />
+      )}
     </div>
   );
 }

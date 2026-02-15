@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import Landing from "@/pages/landing";
+import Home from "@/pages/home";
 import Garden from "@/pages/garden";
 import ChildView from "@/pages/child-view";
 import AddChild from "@/pages/add-child";
@@ -28,7 +29,7 @@ function Router() {
 
   return (
     <Switch>
-      <Route path="/" component={Garden} />
+      <Route path="/" component={Home} />
       <Route path="/garden/:childId" component={Garden} />
       <Route path="/add-child" component={AddChild} />
       <Route path="/view/:childId" component={ChildView} />

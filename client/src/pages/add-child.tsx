@@ -13,6 +13,7 @@ export default function AddChild() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [name, setName] = useState("");
+  const [nickname, setNickname] = useState("");
   const [birthday, setBirthday] = useState("");
 
   const createChild = useMutation({
@@ -33,7 +34,7 @@ export default function AddChild() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    createChild.mutate({ name: name.trim(), birthday: birthday || undefined });
+    createChild.mutate({ name: name.trim(), nickname: nickname.trim() || undefined, birthday: birthday || undefined });
   };
 
   return (
@@ -74,6 +75,16 @@ export default function AddChild() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 data-testid="input-child-name"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="nickname">Nickname (optional)</Label>
+              <Input
+                id="nickname"
+                placeholder="What do you call them? e.g. bug, sunshine, little pilot"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
               />
             </div>
 

@@ -13,9 +13,11 @@ export type MemoryType = typeof memoryTypes[number];
 export const children = pgTable("children", {
   id: varchar("id").primaryKey(),
   name: text("name").notNull(),
+  nickname: text("nickname"),
   birthday: text("birthday"),
   viewMode: text("view_mode").default("device"),
   age: integer("age"),
+  profilePhoto: text("profile_photo"),
   parentId: varchar("parent_id").notNull(),
 });
 

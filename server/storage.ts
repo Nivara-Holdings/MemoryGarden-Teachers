@@ -100,6 +100,15 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return child;
   }
+
+  async updateChild(id: string, updates: Partial<InsertChild>): Promise<Child | undefined> {
+    const [child] = await db
+      .update(children)
+      .set(updates)
+      .where(eq(children.id, id))
+      .returning();
+    return child || undefined;
+  }
 }
 
 export const storage = new DatabaseStorage();
