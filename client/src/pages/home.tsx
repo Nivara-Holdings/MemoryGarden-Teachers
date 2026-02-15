@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Plus, LogOut, Loader2, Camera, Pencil } from "lucide-react";
+import { Plus, LogOut, Loader2, Camera, Pencil, Sprout } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -113,7 +113,11 @@ export default function Home() {
       {/* Warm header area */}
       <div className="bg-gradient-to-b from-[hsl(var(--sage-light))] to-background px-6 pt-10 pb-8">
         <div className="flex items-center justify-between mb-8">
-          <span className="font-serif text-xl text-primary">Memory Garden</span>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-[hsl(var(--sage-light))] flex items-center justify-center">
+              <Sprout className="w-4 h-4 text-primary" />
+            </div>
+          </div>
           <button
             onClick={() => logout()}
             className="text-muted-foreground hover:text-foreground transition-colors"

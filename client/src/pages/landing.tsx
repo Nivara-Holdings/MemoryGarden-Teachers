@@ -70,29 +70,60 @@ export default function Landing() {
 
   if (screen === "home") {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 max-w-[430px] mx-auto">
-        <div className="text-center space-y-6 w-full">
-          <div className="w-24 h-24 rounded-full bg-[hsl(var(--sage-light))] mx-auto flex items-center justify-center">
-            <Sprout className="w-12 h-12 text-primary" />
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-3xl font-serif">Memory Garden</h1>
-            <p className="text-lg text-muted-foreground italic">"So they never have to wonder."</p>
-          </div>
-          <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-            Record moments, voice notes, and keepsakes. Let your children discover them when they're ready.
-          </p>
-          <div className="space-y-3 pt-4">
-            <Button size="lg" className="w-full py-6 text-base rounded-xl" onClick={() => setScreen("signup")}>
-              Get Started
-            </Button>
-            <p className="text-center text-muted-foreground text-sm">
-              Already have an account?{" "}
-              <span className="text-primary cursor-pointer hover:underline" onClick={() => setScreen("login")}>
-                Log in
-              </span>
+      <div className="min-h-screen flex flex-col bg-background max-w-[430px] mx-auto relative overflow-hidden">
+        {/* Subtle background circles */}
+        <div className="absolute top-[-60px] right-[-40px] w-48 h-48 rounded-full bg-[hsl(var(--sage-light))] opacity-40" />
+        <div className="absolute bottom-[200px] left-[-60px] w-36 h-36 rounded-full bg-[hsl(var(--sage-light))] opacity-30" />
+
+        <div className="flex-1 flex flex-col justify-center px-8 relative z-10">
+          {/* Logo */}
+          <div className="text-center mb-10">
+            <div className="w-20 h-20 rounded-full bg-[hsl(var(--sage-light))] mx-auto mb-8 flex items-center justify-center">
+              <Sprout className="w-10 h-10 text-primary" />
+            </div>
+            <h1 className="text-4xl font-serif tracking-tight text-foreground mb-3">
+              Memory Garden
+            </h1>
+            <p className="text-base text-primary/80 italic font-serif">
+              So they never have to wonder.
             </p>
           </div>
+
+          {/* Value props */}
+          <div className="space-y-4 mb-12 max-w-[300px] mx-auto">
+            <div className="flex items-start gap-3">
+              <span className="text-lg mt-0.5">💛</span>
+              <p className="text-sm text-muted-foreground">Capture everyday moments before they slip away</p>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="text-lg mt-0.5">🌱</span>
+              <p className="text-sm text-muted-foreground">Watch their story grow, month by month</p>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="text-lg mt-0.5">⭐</span>
+              <p className="text-sm text-muted-foreground">Give them a gift they'll treasure forever</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom CTA */}
+        <div className="px-8 pb-10 relative z-10 space-y-4">
+          <Button 
+            size="lg" 
+            className="w-full py-6 text-base rounded-2xl shadow-md" 
+            onClick={() => setScreen("signup")}
+          >
+            Get Started
+          </Button>
+          <p className="text-center text-muted-foreground text-sm">
+            Already have an account?{" "}
+            <span 
+              className="text-primary cursor-pointer hover:underline font-medium" 
+              onClick={() => setScreen("login")}
+            >
+              Log in
+            </span>
+          </p>
         </div>
       </div>
     );
@@ -101,31 +132,37 @@ export default function Landing() {
   if (screen === "login") {
     return (
       <div className="min-h-screen bg-background max-w-[430px] mx-auto">
-        <header className="flex items-center justify-between gap-4 px-6 py-5 border-b border-border">
+        <header className="flex items-center gap-4 px-6 py-5">
           <button onClick={() => setScreen("home")} className="text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft className="w-6 h-6" />
+            <ArrowLeft className="w-5 h-5" />
           </button>
-          <span className="text-lg">Log In</span>
-          <div className="w-6" />
         </header>
-        <div className="px-6 py-8 space-y-6">
-          <div className="space-y-2">
-            <Label className="text-muted-foreground text-sm">Email</Label>
-            <Input type="email" placeholder="Enter your email" value={email} onChange={(e) => setEmail(e.target.value)} className="py-4 px-4 text-base rounded-xl border-border" />
+        <div className="px-8 py-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Sprout className="w-5 h-5 text-primary" />
+            <span className="font-serif text-primary text-sm">Memory Garden</span>
           </div>
-          <div className="space-y-2">
-            <Label className="text-muted-foreground text-sm">Password</Label>
-            <Input type="password" placeholder="Enter your password" value={password} onChange={(e) => setPassword(e.target.value)} className="py-4 px-4 text-base rounded-xl border-border" onKeyDown={(e) => e.key === "Enter" && handleLogin()} />
+          <h2 className="text-2xl font-serif mb-8">Welcome back</h2>
+          
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <Label className="text-muted-foreground text-sm">Email</Label>
+              <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="py-5 px-4 text-base rounded-xl" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-muted-foreground text-sm">Password</Label>
+              <Input type="password" placeholder="Your password" value={password} onChange={(e) => setPassword(e.target.value)} className="py-5 px-4 text-base rounded-xl" onKeyDown={(e) => e.key === "Enter" && handleLogin()} />
+            </div>
+            <Button onClick={handleLogin} className="w-full py-6 text-base rounded-xl" disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Log In"}
+            </Button>
+            <p className="text-center text-muted-foreground text-sm pt-2">
+              Don't have an account?{" "}
+              <span className="text-primary cursor-pointer hover:underline font-medium" onClick={() => { setScreen("signup"); setEmail(""); setPassword(""); }}>
+                Sign up
+              </span>
+            </p>
           </div>
-          <Button onClick={handleLogin} className="w-full py-6 text-base rounded-xl mt-4" disabled={isSubmitting}>
-            {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Log In"}
-          </Button>
-          <p className="text-center text-muted-foreground text-sm">
-            Don't have an account?{" "}
-            <span className="text-primary cursor-pointer hover:underline" onClick={() => { setScreen("signup"); setEmail(""); setPassword(""); }}>
-              Sign up
-            </span>
-          </p>
         </div>
       </div>
     );
@@ -134,39 +171,47 @@ export default function Landing() {
   if (screen === "signup") {
     return (
       <div className="min-h-screen bg-background max-w-[430px] mx-auto">
-        <header className="flex items-center justify-between gap-4 px-6 py-5 border-b border-border">
+        <header className="flex items-center gap-4 px-6 py-5">
           <button onClick={() => setScreen("home")} className="text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft className="w-6 h-6" />
+            <ArrowLeft className="w-5 h-5" />
           </button>
-          <span className="text-lg">Create Account</span>
-          <div className="w-6" />
         </header>
-        <div className="px-6 py-8 space-y-6">
-          <div className="space-y-2">
-            <Label className="text-muted-foreground text-sm">First name</Label>
-            <Input type="text" placeholder="Enter your first name" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="py-4 px-4 text-base rounded-xl border-border" />
+        <div className="px-8 py-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Sprout className="w-5 h-5 text-primary" />
+            <span className="font-serif text-primary text-sm">Memory Garden</span>
           </div>
-          <div className="space-y-2">
-            <Label className="text-muted-foreground text-sm">Last name</Label>
-            <Input type="text" placeholder="Enter your last name" value={lastName} onChange={(e) => setLastName(e.target.value)} className="py-4 px-4 text-base rounded-xl border-border" />
+          <h2 className="text-2xl font-serif mb-8">Create your garden</h2>
+          
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label className="text-muted-foreground text-sm">First name</Label>
+                <Input type="text" placeholder="First" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="py-5 px-4 text-base rounded-xl" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-muted-foreground text-sm">Last name</Label>
+                <Input type="text" placeholder="Last" value={lastName} onChange={(e) => setLastName(e.target.value)} className="py-5 px-4 text-base rounded-xl" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-muted-foreground text-sm">Email</Label>
+              <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="py-5 px-4 text-base rounded-xl" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-muted-foreground text-sm">Password</Label>
+              <Input type="password" placeholder="Create a password" value={password} onChange={(e) => setPassword(e.target.value)} className="py-5 px-4 text-base rounded-xl" onKeyDown={(e) => e.key === "Enter" && handleRegister()} />
+            </div>
+            <Button onClick={handleRegister} className="w-full py-6 text-base rounded-xl" disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Create Account"}
+            </Button>
+            <p className="text-center text-muted-foreground text-sm pt-2">
+              Already have an account?{" "}
+              <span className="text-primary cursor-pointer hover:underline font-medium" onClick={() => { setScreen("login"); setEmail(""); setPassword(""); }}>
+                Log in
+              </span>
+            </p>
           </div>
-          <div className="space-y-2">
-            <Label className="text-muted-foreground text-sm">Email</Label>
-            <Input type="email" placeholder="Enter your email" value={email} onChange={(e) => setEmail(e.target.value)} className="py-4 px-4 text-base rounded-xl border-border" />
-          </div>
-          <div className="space-y-2">
-            <Label className="text-muted-foreground text-sm">Password</Label>
-            <Input type="password" placeholder="Create a password" value={password} onChange={(e) => setPassword(e.target.value)} className="py-4 px-4 text-base rounded-xl border-border" onKeyDown={(e) => e.key === "Enter" && handleRegister()} />
-          </div>
-          <Button onClick={handleRegister} className="w-full py-6 text-base rounded-xl mt-4" disabled={isSubmitting}>
-            {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Create Account"}
-          </Button>
-          <p className="text-center text-muted-foreground text-sm">
-            Already have an account?{" "}
-            <span className="text-primary cursor-pointer hover:underline" onClick={() => { setScreen("login"); setEmail(""); setPassword(""); }}>
-              Log in
-            </span>
-          </p>
         </div>
       </div>
     );
