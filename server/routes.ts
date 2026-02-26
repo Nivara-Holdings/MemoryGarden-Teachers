@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { insertMemorySchema, insertChildSchema } from "@shared/schema";
 import { z } from "zod";
 import { isAuthenticated } from "./replit_integrations/auth";
+import { authStorage } from "./replit_integrations/auth/storage";
 import { randomUUID } from "crypto";
 import path from "path";
 import fs from "fs";
@@ -29,6 +30,73 @@ export async function registerRoutes(
       res.status(404).json({ error: "File not found" });
     }
   });
+
+  // Helper: check if user is parent, co-parent, or linked teacher for a child
+  async function canAccessChild(userId: string, childId: string): Promise<boolean> {
+    const child = await storage.getChild(childId);
+    if (!child) return false;
+    if (child.parentId === userId) return true;
+    const teacherLink = await storage.getTeacherLink(userId, childId);
+    if (teacherLink) return true;
+    // Check co-parent
+    const coParentLinks = await storage.getCoParentsByChild(childId);
+    if (coParentLinks.some(cp => cp.parentId === userId)) return true;
+    return false;
+  }
+
+  // Helper: check if user is a teacher for this child
+  async function isTeacherForChild(userId: string, childId: string): Promise<boolean> {
+    const link = await storage.getTeacherLink(userId, childId);
+    return !!link;
+  }
+
+  // ---- ADMIN: Cleanup duplicate children (remove after use) ----
+  app.get("/api/admin/children", isAuthenticated, async (req: any, res) => {
+    try {
+      const { db } = await import("./db");
+      const { children, memories, teacherChildren } = await import("@shared/schema");
+      const { sql } = await import("drizzle-orm");
+      const all = await db.select().from(children);
+      const memCounts = await db.select({ 
+        childId: memories.childId, 
+        count: sql<number>`count(*)::int` 
+      }).from(memories).groupBy(memories.childId);
+      const links = await db.select().from(teacherChildren);
+      res.json({ children: all, memoryCounts: memCounts, teacherLinks: links });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.delete("/api/admin/children/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { db } = await import("./db");
+      const { children, memories, teacherChildren } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      await db.delete(teacherChildren).where(eq(teacherChildren.childId, id));
+      await db.delete(memories).where(eq(memories.childId, id));
+      await db.delete(children).where(eq(children.id, id));
+      res.json({ deleted: id });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Fix teacher memories: set from/source for memories created by teachers
+  app.patch("/api/admin/fix-teacher-memories", isAuthenticated, async (req: any, res) => {
+    try {
+      const { db } = await import("./db");
+      const { memories, teacherChildren } = await import("@shared/schema");
+      const { eq, inArray } = await import("drizzle-orm");
+      // Get all teacher user IDs
+      const links = await db.select().from(teacherChildren);
+      const teacherIds = [...new Set(links.map(l => l.teacherId))];
+      if (teacherIds.length === 0) return res.json({ updated: 0 });
+      // Update memories created by teachers
+      const result = await db.update(memories)
+        .set({ from: "Teacher", source: "teacher" })
+        .where(inArray(memories.parentId, teacherIds));
+      res.json({ updated: "done", teacherIds });
+    } catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  // ---- END ADMIN ----
 
   // Upload request URL (replaces Replit Object Storage)
   app.post("/api/uploads/request-url", isAuthenticated, (req: any, res) => {
@@ -63,17 +131,20 @@ export async function registerRoutes(
     }
   });
 
-  // Get memories for a child (authenticated parent only)
+  // Get memories for a child (parent sees all, teacher sees own only)
   app.get("/api/memories/:childId", isAuthenticated, async (req: any, res) => {
     try {
       const { childId } = req.params;
-      const parentId = req.user?.claims?.sub;
-      const child = await storage.getChild(childId);
-      if (!child || child.parentId !== parentId) {
+      const userId = req.user?.claims?.sub;
+      if (!await canAccessChild(userId, childId)) {
         return res.status(403).json({ error: "Access denied" });
       }
-      const memories = await storage.getMemories(childId);
-      res.json(memories);
+      let allMemories = await storage.getMemories(childId);
+      // Teachers only see their own memories
+      if (await isTeacherForChild(userId, childId)) {
+        allMemories = allMemories.filter(m => m.parentId === userId);
+      }
+      res.json(allMemories);
     } catch (error) {
       console.error("Error fetching memories:", error);
       res.status(500).json({ error: "Failed to fetch memories" });
@@ -84,10 +155,10 @@ export async function registerRoutes(
   app.get("/api/memory/:id", isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
-      const parentId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub;
       const memory = await storage.getMemory(id);
       if (!memory) return res.status(404).json({ error: "Memory not found" });
-      if (memory.parentId !== parentId) return res.status(403).json({ error: "Access denied" });
+      if (!await canAccessChild(userId, memory.childId)) return res.status(403).json({ error: "Access denied" });
       res.json(memory);
     } catch (error) {
       console.error("Error fetching memory:", error);
@@ -95,10 +166,14 @@ export async function registerRoutes(
     }
   });
 
-  // Create memory
+  // Create memory (parent or linked teacher)
   app.post("/api/memories", isAuthenticated, async (req: any, res) => {
     try {
       const parentId = req.user?.claims?.sub;
+      // Verify access to this child
+      if (req.body.childId && !await canAccessChild(parentId, req.body.childId)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       const validatedData = insertMemorySchema.parse({ ...req.body, parentId });
       const memory = await storage.createMemory(validatedData);
       res.status(201).json(memory);
@@ -111,14 +186,14 @@ export async function registerRoutes(
     }
   });
 
-  // Update memory
+  // Update memory (only your own)
   app.patch("/api/memories/:id", isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
-      const parentId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub;
       const memory = await storage.getMemory(id);
       if (!memory) return res.status(404).json({ error: "Memory not found" });
-      if (memory.parentId !== parentId) return res.status(403).json({ error: "Access denied" });
+      if (memory.parentId !== userId) return res.status(403).json({ error: "Access denied" });
       const allowedFields = ['rawNote', 'refinedNote', 'shared', 'from', 'source', 'keepsakeType', 'date'] as const;
       const updates: Record<string, any> = {};
       for (const field of allowedFields) {
@@ -132,14 +207,14 @@ export async function registerRoutes(
     }
   });
 
-  // Delete memory
+  // Delete memory (only your own)
   app.delete("/api/memories/:id", isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
-      const parentId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub;
       const memory = await storage.getMemory(id);
       if (!memory) return res.status(404).json({ error: "Memory not found" });
-      if (memory.parentId !== parentId) return res.status(403).json({ error: "Access denied" });
+      if (memory.parentId !== userId) return res.status(403).json({ error: "Access denied" });
       await storage.deleteMemory(id);
       res.status(204).send();
     } catch (error) {
@@ -148,14 +223,14 @@ export async function registerRoutes(
     }
   });
 
-  // Get child profile
+  // Get child profile (parent or linked teacher)
   app.get("/api/children/:id", isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
-      const parentId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub;
       const child = await storage.getChild(id);
       if (!child) return res.status(404).json({ error: "Child not found" });
-      if (child.parentId !== parentId) return res.status(403).json({ error: "Access denied" });
+      if (!await canAccessChild(userId, id)) return res.status(403).json({ error: "Access denied" });
       res.json(child);
     } catch (error) {
       console.error("Error fetching child:", error);
@@ -163,12 +238,21 @@ export async function registerRoutes(
     }
   });
 
-  // Get all children for current parent
+  // Get all children for current user (parent's own + co-parent + teacher-linked)
   app.get("/api/children", isAuthenticated, async (req: any, res) => {
     try {
-      const parentId = req.user?.claims?.sub;
-      const children = await storage.getChildrenByParent(parentId);
-      res.json(children);
+      const userId = req.user?.claims?.sub;
+      const parentChildren = await storage.getChildrenByParent(userId);
+      const teacherChildren = await storage.getChildrenByTeacher(userId);
+      const coParentChildren = await storage.getChildrenByCoParent(userId);
+      // Merge and deduplicate by id
+      const allChildren = [...parentChildren];
+      for (const tc of [...teacherChildren, ...coParentChildren]) {
+        if (!allChildren.some(c => c.id === tc.id)) {
+          allChildren.push(tc);
+        }
+      }
+      res.json(allChildren);
     } catch (error) {
       console.error("Error fetching children:", error);
       res.status(500).json({ error: "Failed to fetch children" });
@@ -209,6 +293,68 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error updating child:", error);
       res.status(500).json({ error: "Failed to update child" });
+    }
+  });
+
+  // ---- Co-Parent Invites ----
+
+  // Invite a co-parent to a child's garden
+  app.post("/api/children/:childId/invite", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { childId } = req.params;
+      const { email } = req.body;
+      if (!email) return res.status(400).json({ error: "Email is required" });
+
+      // Verify user has access to this child
+      if (!await canAccessChild(userId, childId)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const normalizedEmail = email.trim().toLowerCase();
+
+      // Check if already invited
+      const existing = await storage.getCoParentByEmail(normalizedEmail, childId);
+      if (existing) {
+        return res.status(400).json({ error: "This person has already been invited" });
+      }
+
+      // Check if this is the child's primary parent email
+      const child = await storage.getChild(childId);
+      const primaryParent = child ? await authStorage.getUser(child.parentId) : null;
+      if (primaryParent?.email === normalizedEmail) {
+        return res.status(400).json({ error: "This person is already the primary parent" });
+      }
+
+      // Check if invitee already has an account
+      const invitee = await authStorage.getUserByEmail(normalizedEmail);
+      const invite = await storage.inviteCoParent(
+        normalizedEmail, childId, userId, invitee?.id || undefined
+      );
+
+      res.status(201).json({
+        ...invite,
+        linked: !!invitee,
+      });
+    } catch (error) {
+      console.error("Error inviting co-parent:", error);
+      res.status(500).json({ error: "Failed to invite co-parent" });
+    }
+  });
+
+  // Get co-parents for a child
+  app.get("/api/children/:childId/co-parents", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { childId } = req.params;
+      if (!await canAccessChild(userId, childId)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const coParentsList = await storage.getCoParentsByChild(childId);
+      res.json(coParentsList);
+    } catch (error) {
+      console.error("Error fetching co-parents:", error);
+      res.status(500).json({ error: "Failed to fetch co-parents" });
     }
   });
 
@@ -464,6 +610,192 @@ Rules:
     } catch (error) {
       console.error("Error generating story:", error);
       res.status(500).json({ error: "Failed to generate story" });
+    }
+  });
+
+  // ========================================
+  // TEACHER ROUTES
+  // ========================================
+
+  // Get children linked to this teacher
+  app.get("/api/teacher/children", isAuthenticated, async (req: any, res) => {
+    try {
+      const teacherId = req.user?.claims?.sub;
+      const children = await storage.getChildrenByTeacher(teacherId);
+      res.json(children);
+    } catch (error) {
+      console.error("Error fetching teacher children:", error);
+      res.status(500).json({ error: "Failed to fetch children" });
+    }
+  });
+
+  // Teacher adds a child (with parent email for linking)
+  app.post("/api/teacher/children", isAuthenticated, async (req: any, res) => {
+    try {
+      const teacherId = req.user?.claims?.sub;
+      const { name, parentEmail, birthday, age } = req.body;
+      if (!name || !parentEmail) {
+        return res.status(400).json({ error: "Child name and parent email are required" });
+      }
+
+      // Check if parent already has an account
+      const existingParent = await authStorage.getUserByEmail(parentEmail);
+      
+      let child;
+      let parentLinked = false;
+
+      if (existingParent) {
+        // Look for an existing child with matching name under this parent
+        const parentChildren = await storage.getChildrenByParent(existingParent.id);
+        const existingChild = parentChildren.find(
+          (c) => c.name.toLowerCase().trim() === name.toLowerCase().trim()
+        );
+
+        if (existingChild) {
+          // Link teacher to the existing child
+          child = existingChild;
+        } else {
+          // Parent exists but no matching child — create under parent
+          child = await storage.createChild({
+            name, parentId: existingParent.id, parentEmail,
+            nickname: null, birthday: birthday || null,
+            viewMode: "device", age: age || null, profilePhoto: null,
+          });
+        }
+        parentLinked = true;
+      } else {
+        // No parent account yet — create child under teacher temporarily
+        child = await storage.createChild({
+          name, parentId: teacherId, parentEmail,
+          nickname: null, birthday: birthday || null,
+          viewMode: "device", age: age || null, profilePhoto: null,
+        });
+      }
+
+      // Link teacher to child (skip if already linked)
+      const existingLink = await storage.getTeacherLink(teacherId, child.id);
+      if (!existingLink) {
+        await storage.linkTeacherToChild(teacherId, child.id);
+      }
+
+      res.status(201).json({
+        ...child,
+        parentLinked,
+      });
+    } catch (error) {
+      console.error("Error adding teacher child:", error);
+      res.status(500).json({ error: "Failed to add child" });
+    }
+  });
+
+  // Teacher removes a child from their list
+  app.delete("/api/teacher/children/:childId", isAuthenticated, async (req: any, res) => {
+    try {
+      const teacherId = req.user?.claims?.sub;
+      const { childId } = req.params;
+
+      // Verify link exists
+      const link = await storage.getTeacherLink(teacherId, childId);
+      if (!link) return res.status(404).json({ error: "Child not linked to you" });
+
+      await storage.unlinkTeacherFromChild(teacherId, childId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error removing teacher child:", error);
+      res.status(500).json({ error: "Failed to remove child" });
+    }
+  });
+
+  // Teacher gets memories they added for a child
+  app.get("/api/teacher/memories/:childId", isAuthenticated, async (req: any, res) => {
+    try {
+      const teacherId = req.user?.claims?.sub;
+      const { childId } = req.params;
+
+      // Verify teacher is linked to this child
+      const link = await storage.getTeacherLink(teacherId, childId);
+      if (!link) return res.status(403).json({ error: "Access denied" });
+
+      const allMemories = await storage.getMemories(childId);
+      // Teacher only sees their own memories
+      const teacherMemories = allMemories.filter(m => m.parentId === teacherId);
+      res.json(teacherMemories);
+    } catch (error) {
+      console.error("Error fetching teacher memories:", error);
+      res.status(500).json({ error: "Failed to fetch memories" });
+    }
+  });
+
+  // Teacher adds a memory for a child
+  app.post("/api/teacher/memories", isAuthenticated, async (req: any, res) => {
+    try {
+      const teacherId = req.user?.claims?.sub;
+      const { childId, rawNote, date, type, source } = req.body;
+      if (!childId || !rawNote) {
+        return res.status(400).json({ error: "childId and rawNote are required" });
+      }
+
+      // Verify teacher is linked to this child
+      const link = await storage.getTeacherLink(teacherId, childId);
+      if (!link) return res.status(403).json({ error: "Access denied" });
+
+      const memory = await storage.createMemory({
+        type: type || "moment",
+        rawNote,
+        refinedNote: null,
+        date: date || new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        mediaUrl: null,
+        mediaType: null,
+        shared: true,
+        from: "Teacher",
+        duration: null,
+        source: source || "teacher",
+        keepsakeType: null,
+        childId,
+        parentId: teacherId,
+      });
+      res.status(201).json(memory);
+    } catch (error) {
+      console.error("Error creating teacher memory:", error);
+      res.status(500).json({ error: "Failed to create memory" });
+    }
+  });
+
+  // Teacher updates their own memory
+  app.patch("/api/teacher/memories/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const teacherId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const memory = await storage.getMemory(id);
+      if (!memory) return res.status(404).json({ error: "Memory not found" });
+      if (memory.parentId !== teacherId) return res.status(403).json({ error: "Access denied" });
+
+      const allowedFields = ['rawNote', 'refinedNote', 'date', 'source'] as const;
+      const updates: Record<string, any> = {};
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) updates[field] = req.body[field];
+      }
+      const updated = await storage.updateMemory(id, updates);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating teacher memory:", error);
+      res.status(500).json({ error: "Failed to update memory" });
+    }
+  });
+
+  // Teacher deletes their own memory
+  app.delete("/api/teacher/memories/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const teacherId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const memory = await storage.getMemory(id);
+      if (!memory) return res.status(404).json({ error: "Memory not found" });
+      if (memory.parentId !== teacherId) return res.status(403).json({ error: "Access denied" });
+      await storage.deleteMemory(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting teacher memory:", error);
+      res.status(500).json({ error: "Failed to delete memory" });
     }
   });
 

@@ -1,6 +1,9 @@
 import { sql } from "drizzle-orm";
 import { index, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
 
+export const userRoles = ["mom", "dad", "teacher"] as const;
+export type UserRole = typeof userRoles[number];
+
 export const sessions = pgTable(
   "sessions",
   {
@@ -19,6 +22,7 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   googleId: varchar("google_id").unique(),
+  role: varchar("role").$type<UserRole>(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

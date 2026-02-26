@@ -1,10 +1,12 @@
 import { 
   type Memory, type InsertMemory, 
   type Child, type InsertChild,
-  memories, children
+  type TeacherChild,
+  type CoParent,
+  memories, children, teacherChildren, coParents
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -19,11 +21,27 @@ export interface IStorage {
   // Children
   getChild(id: string): Promise<Child | undefined>;
   getChildrenByParent(parentId: string): Promise<Child[]>;
+  getChildrenByParentEmail(email: string): Promise<Child[]>;
   createChild(child: InsertChild): Promise<Child>;
+  updateChild(id: string, updates: Partial<InsertChild>): Promise<Child | undefined>;
+
+  // Teacher-Child links
+  getChildrenByTeacher(teacherId: string): Promise<Child[]>;
+  linkTeacherToChild(teacherId: string, childId: string): Promise<TeacherChild>;
+  unlinkTeacherFromChild(teacherId: string, childId: string): Promise<void>;
+  getTeacherLink(teacherId: string, childId: string): Promise<TeacherChild | undefined>;
+
+  // Co-Parent links
+  getChildrenByCoParent(parentId: string): Promise<Child[]>;
+  getCoParentsByChild(childId: string): Promise<CoParent[]>;
+  getCoParentByEmail(email: string, childId: string): Promise<CoParent | undefined>;
+  getPendingCoParentInvites(email: string): Promise<CoParent[]>;
+  inviteCoParent(email: string, childId: string, invitedBy: string, parentId?: string): Promise<CoParent>;
+  linkCoParent(email: string, parentId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
-  // Memories
+  // ---- Memories ----
   async getMemories(childId: string): Promise<Memory[]> {
     return db
       .select()
@@ -82,7 +100,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(memories).where(eq(memories.id, id));
   }
 
-  // Children
+  // ---- Children ----
   async getChild(id: string): Promise<Child | undefined> {
     const [child] = await db.select().from(children).where(eq(children.id, id));
     return child || undefined;
@@ -90,6 +108,10 @@ export class DatabaseStorage implements IStorage {
 
   async getChildrenByParent(parentId: string): Promise<Child[]> {
     return db.select().from(children).where(eq(children.parentId, parentId));
+  }
+
+  async getChildrenByParentEmail(email: string): Promise<Child[]> {
+    return db.select().from(children).where(eq(children.parentEmail, email));
   }
 
   async createChild(insertChild: InsertChild): Promise<Child> {
@@ -108,6 +130,93 @@ export class DatabaseStorage implements IStorage {
       .where(eq(children.id, id))
       .returning();
     return child || undefined;
+  }
+
+  // ---- Teacher-Child Links ----
+  async getChildrenByTeacher(teacherId: string): Promise<Child[]> {
+    const links = await db
+      .select()
+      .from(teacherChildren)
+      .where(eq(teacherChildren.teacherId, teacherId));
+    
+    const results: Child[] = [];
+    for (const link of links) {
+      const child = await this.getChild(link.childId);
+      if (child) results.push(child);
+    }
+    return results;
+  }
+
+  async linkTeacherToChild(teacherId: string, childId: string): Promise<TeacherChild> {
+    const id = randomUUID();
+    const [link] = await db
+      .insert(teacherChildren)
+      .values({ id, teacherId, childId })
+      .returning();
+    return link;
+  }
+
+  async unlinkTeacherFromChild(teacherId: string, childId: string): Promise<void> {
+    await db
+      .delete(teacherChildren)
+      .where(and(eq(teacherChildren.teacherId, teacherId), eq(teacherChildren.childId, childId)));
+  }
+
+  async getTeacherLink(teacherId: string, childId: string): Promise<TeacherChild | undefined> {
+    const [link] = await db
+      .select()
+      .from(teacherChildren)
+      .where(and(eq(teacherChildren.teacherId, teacherId), eq(teacherChildren.childId, childId)));
+    return link || undefined;
+  }
+
+  // ---- Co-Parent Links ----
+  async getChildrenByCoParent(parentId: string): Promise<Child[]> {
+    const links = await db
+      .select()
+      .from(coParents)
+      .where(eq(coParents.parentId, parentId));
+    const results: Child[] = [];
+    for (const link of links) {
+      const child = await this.getChild(link.childId);
+      if (child) results.push(child);
+    }
+    return results;
+  }
+
+  async getCoParentsByChild(childId: string): Promise<CoParent[]> {
+    return db.select().from(coParents).where(eq(coParents.childId, childId));
+  }
+
+  async getCoParentByEmail(email: string, childId: string): Promise<CoParent | undefined> {
+    const [link] = await db
+      .select()
+      .from(coParents)
+      .where(and(eq(coParents.email, email), eq(coParents.childId, childId)));
+    return link || undefined;
+  }
+
+  async getPendingCoParentInvites(email: string): Promise<CoParent[]> {
+    return db
+      .select()
+      .from(coParents)
+      .where(and(eq(coParents.email, email), eq(coParents.parentId, null as any)));
+  }
+
+  async inviteCoParent(email: string, childId: string, invitedBy: string, parentId?: string): Promise<CoParent> {
+    const id = randomUUID();
+    const [link] = await db
+      .insert(coParents)
+      .values({ id, email, childId, invitedBy, parentId: parentId || null })
+      .returning();
+    return link;
+  }
+
+  async linkCoParent(email: string, parentId: string): Promise<void> {
+    await db
+      .update(coParents)
+      .set({ parentId })
+      .where(and(eq(coParents.email, email), eq(coParents.parentId, null as any)));
   }
 }
 

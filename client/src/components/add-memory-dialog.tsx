@@ -20,6 +20,7 @@ interface AddMemoryDialogProps {
   childId: string;
   childName?: string;
   childNickname?: string;
+  userRole?: string | null;
 }
 
 const categories = [
@@ -29,11 +30,14 @@ const categories = [
   { key: "keepsake", emoji: "🎨", label: "Keepsake" },
 ];
 
-export default function AddMemoryDialog({ open, onOpenChange, onSubmit, childId, childName, childNickname }: AddMemoryDialogProps) {
+export default function AddMemoryDialog({ open, onOpenChange, onSubmit, childId, childName, childNickname, userRole }: AddMemoryDialogProps) {
+  const isTeacher = userRole === "teacher";
+  const defaultFrom = isTeacher ? "Teacher" : userRole === "dad" ? "Dad" : "Mom";
+
   const [note, setNote] = useState("");
   const [refinedNote, setRefinedNote] = useState("");
   const [category, setCategory] = useState("moment");
-  const [from, setFrom] = useState("Mom");
+  const [from, setFrom] = useState(defaultFrom);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [isPolishing, setIsPolishing] = useState(false);
@@ -52,7 +56,7 @@ export default function AddMemoryDialog({ open, onOpenChange, onSubmit, childId,
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const resetState = () => {
-    setNote(""); setRefinedNote(""); setCategory("moment"); setFrom("Mom");
+    setNote(""); setRefinedNote(""); setCategory("moment"); setFrom(defaultFrom);
     setIsRecording(false); setRecordingTime(0); setMediaUrls([]);
     setMemoryDate(new Date().toISOString().split('T')[0]);
     setIsTranscribing(false); setSaveVoice(true); setAudioUrl(null); setPolishingStyle(null);
@@ -192,7 +196,7 @@ export default function AddMemoryDialog({ open, onOpenChange, onSubmit, childId,
       type: category === "keepsake" ? "keepsake" : "moment",
       rawNote: note, refinedNote: refinedNote || null, date: dateStr, shared: true, from, childId,
       mediaUrl: finalMediaUrl, mediaType: finalMediaType,
-      source: selectedCat ? `${selectedCat.emoji} ${selectedCat.label}` : null,
+      source: isTeacher ? "teacher" : (selectedCat ? `${selectedCat.emoji} ${selectedCat.label}` : null),
       ...(audioUrl && { duration: `${Math.floor(recordingTime / 60)}:${String(recordingTime % 60).padStart(2, "0")}` }),
     });
     resetState();
@@ -205,12 +209,13 @@ export default function AddMemoryDialog({ open, onOpenChange, onSubmit, childId,
     <Dialog open={open} onOpenChange={(v) => { if (!v) resetState(); onOpenChange(v); }}>
       <DialogContent className="max-w-[400px] p-0 gap-0 rounded-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
         <DialogHeader className="px-6 py-5 border-b border-border">
-          <DialogTitle className="text-lg text-center">Add a Memory</DialogTitle>
+          <DialogTitle className="text-lg text-center">{isTeacher ? "Add a Note" : "Add a Memory"}</DialogTitle>
         </DialogHeader>
 
         <div className="p-6 space-y-5">
 
-          {/* Category circles */}
+          {/* Category circles — parents only */}
+          {!isTeacher && (
           <div className="space-y-2">
             <Label className="text-muted-foreground text-sm">What kind of memory?</Label>
             <div className="flex justify-between">
@@ -230,6 +235,7 @@ export default function AddMemoryDialog({ open, onOpenChange, onSubmit, childId,
               ))}
             </div>
           </div>
+          )}
 
           {/* What happened + mic */}
           <div className="space-y-2">
@@ -275,7 +281,7 @@ export default function AddMemoryDialog({ open, onOpenChange, onSubmit, childId,
             </div>
           )}
 
-          {/* AI Polish buttons with sparkle icon */}
+          {/* AI Polish buttons */}
           {note.trim() && (
             <div className="space-y-3">
               <Label className="text-muted-foreground text-sm">Refine your words</Label>
@@ -285,6 +291,7 @@ export default function AddMemoryDialog({ open, onOpenChange, onSubmit, childId,
                 </p>
               )}
               <div className="flex gap-2">
+                {!isTeacher && (
                 <Button
                   type="button"
                   variant="outline"
@@ -298,6 +305,7 @@ export default function AddMemoryDialog({ open, onOpenChange, onSubmit, childId,
                     <><Sparkles className="w-3.5 h-3.5" /> Fix it</>
                   )}
                 </Button>
+                )}
                 <Button
                   type="button"
                   variant="outline"
@@ -371,7 +379,8 @@ export default function AddMemoryDialog({ open, onOpenChange, onSubmit, childId,
             )}
           </div>
 
-          {/* Who is this from */}
+          {/* Who is this from — parents only */}
+          {!isTeacher && (
           <div className="space-y-2">
             <Label className="text-muted-foreground text-sm">Who is this from?</Label>
             <Input
@@ -381,6 +390,7 @@ export default function AddMemoryDialog({ open, onOpenChange, onSubmit, childId,
               className="py-3 px-4 text-base rounded-xl"
             />
           </div>
+          )}
 
           {/* When */}
           <div className="space-y-2">

@@ -2,11 +2,12 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Sprout, ArrowLeft, Loader2 } from "lucide-react";
+import { Sprout, ArrowLeft, Loader2, Heart, GraduationCap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
 type Screen = "home" | "login" | "signup";
+type Role = "mom" | "dad" | "teacher";
 
 export default function Landing() {
   const [screen, setScreen] = useState<Screen>("home");
@@ -14,6 +15,7 @@ export default function Landing() {
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [role, setRole] = useState<Role | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -48,13 +50,17 @@ export default function Landing() {
       toast({ title: "Error", description: "Email and password are required", variant: "destructive" });
       return;
     }
+    if (!role) {
+      toast({ title: "Error", description: "Please select your role", variant: "destructive" });
+      return;
+    }
     setIsSubmitting(true);
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email, password, firstName, lastName }),
+        body: JSON.stringify({ email, password, firstName, lastName, role }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -181,9 +187,35 @@ export default function Landing() {
             <Sprout className="w-5 h-5 text-primary" />
             <span className="font-serif text-primary text-sm">Memory Garden</span>
           </div>
-          <h2 className="text-2xl font-serif mb-8">Create your garden</h2>
+          <h2 className="text-2xl font-serif mb-6">Create your garden</h2>
           
           <div className="space-y-5">
+            {/* Role Picker */}
+            <div className="space-y-2">
+              <Label className="text-muted-foreground text-sm">I am a...</Label>
+              <div className="grid grid-cols-3 gap-3">
+                {([
+                  { value: "mom" as Role, label: "Mom" },
+                  { value: "dad" as Role, label: "Dad" },
+                  { value: "teacher" as Role, label: "Teacher" },
+                ]).map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setRole(option.value)}
+                    className={`py-3 rounded-xl border-2 transition-all ${
+                      role === option.value
+                        ? "border-primary bg-primary/5 shadow-sm"
+                        : "border-border hover:border-primary/30"
+                    }`}
+                  >
+                    <span className={`text-sm font-medium ${role === option.value ? "text-primary" : "text-foreground"}`}>
+                      {option.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label className="text-muted-foreground text-sm">First name</Label>
@@ -202,7 +234,7 @@ export default function Landing() {
               <Label className="text-muted-foreground text-sm">Password</Label>
               <Input type="password" placeholder="Create a password" value={password} onChange={(e) => setPassword(e.target.value)} className="py-5 px-4 text-base rounded-xl" onKeyDown={(e) => e.key === "Enter" && handleRegister()} />
             </div>
-            <Button onClick={handleRegister} className="w-full py-6 text-base rounded-xl" disabled={isSubmitting}>
+            <Button onClick={handleRegister} className="w-full py-6 text-base rounded-xl" disabled={isSubmitting || !role}>
               {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Create Account"}
             </Button>
             <p className="text-center text-muted-foreground text-sm pt-2">

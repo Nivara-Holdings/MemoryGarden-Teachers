@@ -9,6 +9,7 @@ import Home from "@/pages/home";
 import Garden from "@/pages/garden";
 import ChildView from "@/pages/child-view";
 import AddChild from "@/pages/add-child";
+import TeacherDashboard from "@/pages/teacher-dashboard";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
 
@@ -27,9 +28,11 @@ function Router() {
     return <Landing />;
   }
 
+  const isTeacher = user?.role === "teacher";
+
   return (
     <Switch>
-      <Route path="/" component={Home} />
+      <Route path="/" component={isTeacher ? TeacherDashboard : Home} />
       <Route path="/garden/:childId" component={Garden} />
       <Route path="/add-child" component={AddChild} />
       <Route path="/view/:childId" component={ChildView} />

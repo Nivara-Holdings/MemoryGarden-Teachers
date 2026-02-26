@@ -1,6 +1,7 @@
 import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import { authStorage } from "./storage";
+import { storage } from "../../storage";
 import { randomUUID, createHash } from "crypto";
 import connectPg from "connect-pg-simple";
 
@@ -10,6 +11,24 @@ function hashPassword(password: string): string {
 
 function verifyPassword(password: string, hash: string): boolean {
   return hashPassword(password) === hash;
+}
+
+// When a parent signs up, auto-link any children a teacher already added with their email
+// AND link any co-parent invites
+async function autoLinkChildrenByEmail(userId: string, email: string) {
+  try {
+    // Link teacher-added children
+    const unlinkedChildren = await storage.getChildrenByParentEmail(email);
+    for (const child of unlinkedChildren) {
+      if (child.parentId !== userId) {
+        await storage.updateChild(child.id, { parentId: userId });
+      }
+    }
+    // Link co-parent invites
+    await storage.linkCoParent(email, userId);
+  } catch (error) {
+    console.error("Auto-link children error:", error);
+  }
 }
 
 export function getSession() {
@@ -47,9 +66,12 @@ export async function setupAuth(app: Express) {
   // Email/Password Registration
   app.post("/api/auth/register", async (req: any, res) => {
     try {
-      const { email, password, firstName, lastName } = req.body;
+      const { email, password, firstName, lastName, role } = req.body;
       if (!email || !password) {
         return res.status(400).json({ message: "Email and password are required" });
+      }
+      if (role && !["mom", "dad", "teacher"].includes(role)) {
+        return res.status(400).json({ message: "Role must be mom, dad, or teacher" });
       }
       const existingUser = await authStorage.getUserByEmail(email);
       if (existingUser) {
@@ -62,8 +84,15 @@ export async function setupAuth(app: Express) {
         firstName: firstName || null,
         lastName: lastName || null,
         profileImageUrl: null,
+        role: role || null,
       });
       req.session.userId = user.id;
+
+      // Auto-link children if a teacher added them with this email
+      if (role === "mom" || role === "dad") {
+        await autoLinkChildrenByEmail(user.id, email);
+      }
+
       res.status(201).json(user);
     } catch (error) {
       console.error("Registration error:", error);
@@ -96,7 +125,7 @@ export async function setupAuth(app: Express) {
   // Google OAuth
   app.post("/api/auth/google", async (req: any, res) => {
     try {
-      const { credential } = req.body;
+      const { credential, role } = req.body;
       if (!credential) {
         return res.status(400).json({ message: "Google credential is required" });
       }
@@ -113,7 +142,13 @@ export async function setupAuth(app: Express) {
           user = await authStorage.upsertUser({
             id: randomUUID(), email, firstName: given_name || null,
             lastName: family_name || null, profileImageUrl: picture || null, googleId,
+            role: role || null,
           });
+
+          // Auto-link children for new parent accounts
+          if (role === "mom" || role === "dad") {
+            await autoLinkChildrenByEmail(user.id, email);
+          }
         }
       }
       req.session.userId = user.id;
@@ -121,6 +156,31 @@ export async function setupAuth(app: Express) {
     } catch (error) {
       console.error("Google auth error:", error);
       res.status(500).json({ message: "Google authentication failed" });
+    }
+  });
+
+  // Update user role
+  app.patch("/api/auth/role", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { role } = req.body;
+      if (!role || !["mom", "dad", "teacher"].includes(role)) {
+        return res.status(400).json({ message: "Role must be mom, dad, or teacher" });
+      }
+      const user = await authStorage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      const updated = await authStorage.upsertUser({ ...user, role });
+
+      // Auto-link if switching to a parent role
+      if ((role === "mom" || role === "dad") && user.email) {
+        await autoLinkChildrenByEmail(userId, user.email);
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Role update error:", error);
+      res.status(500).json({ message: "Failed to update role" });
     }
   });
 

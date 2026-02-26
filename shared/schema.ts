@@ -19,6 +19,7 @@ export const children = pgTable("children", {
   age: integer("age"),
   profilePhoto: text("profile_photo"),
   parentId: varchar("parent_id").notNull(),
+  parentEmail: varchar("parent_email"),  // set by teacher when adding a child
 });
 
 export const memories = pgTable("memories", {
@@ -39,9 +40,31 @@ export const memories = pgTable("memories", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Links teachers to children they manage
+export const teacherChildren = pgTable("teacher_children", {
+  id: varchar("id").primaryKey(),
+  teacherId: varchar("teacher_id").notNull(),
+  childId: varchar("child_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Links co-parents to children (e.g. Dad invited by Mom)
+export const coParents = pgTable("co_parents", {
+  id: varchar("id").primaryKey(),
+  parentId: varchar("parent_id"),          // null until they sign up
+  email: varchar("email").notNull(),        // invited email
+  childId: varchar("child_id").notNull(),
+  invitedBy: varchar("invited_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// ---- Relations ----
+
 export const usersRelations = relations(users, ({ many }) => ({
   children: many(children),
   memories: many(memories),
+  teacherLinks: many(teacherChildren),
+  coParentLinks: many(coParents),
 }));
 
 export const childrenRelations = relations(children, ({ one, many }) => ({
@@ -50,6 +73,8 @@ export const childrenRelations = relations(children, ({ one, many }) => ({
     references: [users.id],
   }),
   memories: many(memories),
+  teacherLinks: many(teacherChildren),
+  coParentLinks: many(coParents),
 }));
 
 export const memoriesRelations = relations(memories, ({ one }) => ({
@@ -63,6 +88,34 @@ export const memoriesRelations = relations(memories, ({ one }) => ({
   }),
 }));
 
+export const teacherChildrenRelations = relations(teacherChildren, ({ one }) => ({
+  teacher: one(users, {
+    fields: [teacherChildren.teacherId],
+    references: [users.id],
+  }),
+  child: one(children, {
+    fields: [teacherChildren.childId],
+    references: [children.id],
+  }),
+}));
+
+export const coParentsRelations = relations(coParents, ({ one }) => ({
+  parent: one(users, {
+    fields: [coParents.parentId],
+    references: [users.id],
+  }),
+  child: one(children, {
+    fields: [coParents.childId],
+    references: [children.id],
+  }),
+  inviter: one(users, {
+    fields: [coParents.invitedBy],
+    references: [users.id],
+  }),
+}));
+
+// ---- Insert Schemas ----
+
 export const insertChildSchema = createInsertSchema(children).omit({ id: true });
 export const insertMemorySchema = createInsertSchema(memories).omit({ id: true, createdAt: true });
 
@@ -70,3 +123,5 @@ export type InsertChild = z.infer<typeof insertChildSchema>;
 export type Child = typeof children.$inferSelect;
 export type InsertMemory = z.infer<typeof insertMemorySchema>;
 export type Memory = typeof memories.$inferSelect;
+export type TeacherChild = typeof teacherChildren.$inferSelect;
+export type CoParent = typeof coParents.$inferSelect;

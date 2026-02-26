@@ -19,7 +19,16 @@ import AddMemoryDialog from "@/components/add-memory-dialog";
 import EditMemoryDialog from "@/components/edit-memory-dialog";
 import StoryViewer from "@/components/story-viewer";
 import { useAuth } from "@/hooks/use-auth";
-import { Menu, LogOut, Plus, Sprout } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Menu, LogOut, Plus, Sprout, UserPlus, Loader2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { Memory, InsertMemory, Child } from "@shared/schema";
 
 const filterOptions = [
@@ -39,7 +48,11 @@ export default function Garden() {
   const [deletingMemoryId, setDeletingMemoryId] = useState<string | null>(null);
   const [storyData, setStoryData] = useState<{ memories: Memory[]; monthLabel: string; summary?: string } | null>(null);
   const [generatingSummary, setGeneratingSummary] = useState<string | null>(null);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
   const { user, logout } = useAuth();
+  const { toast } = useToast();
+  const isTeacher = user?.role === "teacher";
 
   const { data: children = [], isLoading: loadingChildren } = useQuery<Child[]>({
     queryKey: ["/api/children"],
@@ -87,6 +100,28 @@ export default function Garden() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/memories", childId] });
       setDeletingMemoryId(null);
+    },
+  });
+
+  const inviteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/children/${childId}/invite`, {
+        email: inviteEmail.trim().toLowerCase(),
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setShowInviteDialog(false);
+      setInviteEmail("");
+      toast({
+        title: "Invite sent",
+        description: data.linked
+          ? "They already have an account — the garden is now shared!"
+          : "When they sign up, the garden will automatically appear for them.",
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -210,13 +245,24 @@ export default function Garden() {
         <div className="flex items-center gap-2">
           <Sprout className="w-5 h-5 text-primary" />
         </div>
-        <button
-          onClick={() => logout()}
-          className="text-muted-foreground hover:text-foreground transition-colors"
-          data-testid="button-logout"
-        >
-          <LogOut className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-3">
+          {!isTeacher && (
+            <button
+              onClick={() => setShowInviteDialog(true)}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              title="Invite co-parent"
+            >
+              <UserPlus className="w-5 h-5" />
+            </button>
+          )}
+          <button
+            onClick={() => logout()}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            data-testid="button-logout"
+          >
+            <LogOut className="w-5 h-5" />
+          </button>
+        </div>
       </header>
 
       <div className="px-6 py-6">
@@ -236,6 +282,7 @@ export default function Garden() {
           </p>
         </div>
 
+        {!isTeacher && (
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide">
           {filterOptions.map((filter) => {
             const isActive = activeFilter === filter.key;
@@ -256,6 +303,7 @@ export default function Garden() {
             );
           })}
         </div>
+        )}
 
         {loadingMemories ? (
           <div className="space-y-4">
@@ -332,6 +380,7 @@ export default function Garden() {
         childId={childId}
         childName={currentChild?.name}
         childNickname={(currentChild as any)?.nickname}
+        userRole={user?.role}
       />
 
       <EditMemoryDialog
@@ -373,6 +422,41 @@ export default function Garden() {
           onClose={() => setStoryData(null)}
         />
       )}
+
+      {/* Invite Co-Parent Dialog */}
+      <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
+        <DialogContent className="max-w-[380px] rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-serif">Invite Co-Parent</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-sm text-muted-foreground">
+              Share {currentChild?.name}'s garden with another parent or family member. They'll be able to add their own memories.
+            </p>
+            <div className="space-y-2">
+              <Label>Their email</Label>
+              <Input
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="dad@example.com"
+                className="rounded-xl"
+              />
+            </div>
+            <Button
+              onClick={() => inviteMutation.mutate()}
+              disabled={!inviteEmail.trim() || inviteMutation.isPending}
+              className="w-full rounded-xl"
+            >
+              {inviteMutation.isPending ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Inviting...</>
+              ) : (
+                "Invite"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

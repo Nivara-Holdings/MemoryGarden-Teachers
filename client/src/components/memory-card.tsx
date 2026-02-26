@@ -41,6 +41,13 @@ const memoryTypeConfig = {
     icon: Award,
     label: "Keepsake",
   },
+  teacher: {
+    bgClass: "bg-[hsl(var(--sky))]",
+    accentClass: "text-[hsl(var(--sky-dark))]",
+    borderClass: "border-[hsl(var(--sky-dark)/0.3)]",
+    icon: MessageCircle,
+    label: "From Teacher",
+  },
 };
 
 function VoiceMemoPlayer({ memory, isChildView }: { memory: Memory; isChildView?: boolean }) {
@@ -284,7 +291,10 @@ function AudioPlayer({ url, duration }: { url: string; duration?: string | null 
 }
 
 export default function MemoryCard({ memory, isChildView = false, onEdit, onDelete, onTogglePrivacy }: MemoryCardProps) {
-  const config = memoryTypeConfig[memory.type] || memoryTypeConfig.moment;
+  const isFromTeacher = memory.from?.toLowerCase() === "teacher" || memory.source === "teacher";
+  const config = isFromTeacher
+    ? memoryTypeConfig.teacher
+    : (memoryTypeConfig[memory.type] || memoryTypeConfig.moment);
   const Icon = config.icon;
   const showActions = !isChildView && (onEdit || onDelete || onTogglePrivacy);
 
@@ -330,8 +340,8 @@ export default function MemoryCard({ memory, isChildView = false, onEdit, onDele
       
       <div className={`flex items-center gap-2 text-sm font-medium ${config.accentClass} mb-3`}>
         <Icon className="w-4 h-4" />
-        {memory.type === "fromOthers" ? `From ${memory.from}` : config.label}
-        {memory.source && <span className="text-muted-foreground font-normal">({memory.source})</span>}
+        {memory.type === "fromOthers" || isFromTeacher ? `From ${memory.from}` : config.label}
+        {memory.source && !isFromTeacher && <span className="text-muted-foreground font-normal">({memory.source})</span>}
       </div>
 
       {memory.mediaUrl && memory.mediaType === "image" && (
