@@ -296,6 +296,30 @@ export async function registerRoutes(
     }
   });
 
+  // Delete child profile (only the primary parent can delete)
+  app.delete("/api/children/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.claims?.sub;
+      const child = await storage.getChild(id);
+      if (!child) return res.status(404).json({ error: "Child not found" });
+      if (child.parentId !== userId) {
+        return res.status(403).json({ error: "Only the primary parent can delete a child profile" });
+      }
+
+      // Cascade delete: memories, teacher links, co-parent links, then child
+      await storage.deleteMemoriesByChild(id);
+      await storage.deleteTeacherLinksByChild(id);
+      await storage.deleteCoParentsByChild(id);
+      await storage.deleteChild(id);
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting child:", error);
+      res.status(500).json({ error: "Failed to delete child" });
+    }
+  });
+
   // ---- Co-Parent Invites ----
 
   // Invite a co-parent to a child's garden
@@ -685,6 +709,103 @@ Rules:
     } catch (error) {
       console.error("Error adding teacher child:", error);
       res.status(500).json({ error: "Failed to add child" });
+    }
+  });
+
+  // Teacher bulk-adds children via CSV
+  app.post("/api/teacher/children/bulk", isAuthenticated, async (req: any, res) => {
+    try {
+      const teacherId = req.user?.claims?.sub;
+      const { csvContent } = req.body;
+      if (!csvContent || typeof csvContent !== "string") {
+        return res.status(400).json({ error: "CSV content is required" });
+      }
+
+      const lines = csvContent.split(/\r?\n/).filter((line: string) => line.trim());
+      if (lines.length < 2) {
+        return res.status(400).json({ error: "CSV must have a header row and at least one data row" });
+      }
+
+      // Parse header row
+      const headerRaw = lines[0].toLowerCase().split(",").map((h: string) => h.trim());
+      const nameIdx = headerRaw.findIndex((h: string) => h === "name" || h === "child name" || h === "student name" || h === "student");
+      const emailIdx = headerRaw.findIndex((h: string) => h === "parent email" || h === "email" || h === "parent_email");
+      const birthdayIdx = headerRaw.findIndex((h: string) => h === "birthday" || h === "dob" || h === "date of birth");
+      const ageIdx = headerRaw.findIndex((h: string) => h === "age");
+
+      if (nameIdx === -1 || emailIdx === -1) {
+        return res.status(400).json({
+          error: "CSV must have 'name' and 'parent email' columns in the header row",
+        });
+      }
+
+      const results = { created: 0, linked: 0, skipped: 0, errors: [] as string[] };
+
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(",").map((c: string) => c.trim());
+        const name = cols[nameIdx]?.trim();
+        const parentEmailVal = cols[emailIdx]?.trim().toLowerCase();
+
+        if (!name || !parentEmailVal) {
+          results.errors.push(`Row ${i + 1}: missing name or parent email`);
+          results.skipped++;
+          continue;
+        }
+
+        if (!parentEmailVal.includes("@")) {
+          results.errors.push(`Row ${i + 1}: invalid email "${parentEmailVal}"`);
+          results.skipped++;
+          continue;
+        }
+
+        const birthday = birthdayIdx !== -1 ? (cols[birthdayIdx]?.trim() || null) : null;
+        const ageStr = ageIdx !== -1 ? cols[ageIdx]?.trim() : null;
+        const age = ageStr ? parseInt(ageStr) : null;
+
+        try {
+          const existingParent = await authStorage.getUserByEmail(parentEmailVal);
+          let child;
+          let parentLinked = false;
+
+          if (existingParent) {
+            const parentChildren = await storage.getChildrenByParent(existingParent.id);
+            const existingChild = parentChildren.find(
+              (c) => c.name.toLowerCase().trim() === name.toLowerCase().trim()
+            );
+            if (existingChild) {
+              child = existingChild;
+            } else {
+              child = await storage.createChild({
+                name, parentId: existingParent.id, parentEmail: parentEmailVal,
+                nickname: null, birthday: birthday || null,
+                viewMode: "device", age: (age !== null && !isNaN(age)) ? age : null, profilePhoto: null,
+              });
+            }
+            parentLinked = true;
+            results.linked++;
+          } else {
+            child = await storage.createChild({
+              name, parentId: teacherId, parentEmail: parentEmailVal,
+              nickname: null, birthday: birthday || null,
+              viewMode: "device", age: (age !== null && !isNaN(age)) ? age : null, profilePhoto: null,
+            });
+          }
+
+          const existingLink = await storage.getTeacherLink(teacherId, child.id);
+          if (!existingLink) {
+            await storage.linkTeacherToChild(teacherId, child.id);
+          }
+          results.created++;
+        } catch (rowError: any) {
+          results.errors.push(`Row ${i + 1} (${name}): ${rowError.message}`);
+          results.skipped++;
+        }
+      }
+
+      res.status(201).json(results);
+    } catch (error) {
+      console.error("Error bulk adding children:", error);
+      res.status(500).json({ error: "Failed to process CSV" });
     }
   });
 

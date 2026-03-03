@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, LogOut, Loader2, Sprout } from "lucide-react";
+import { Plus, LogOut, Loader2, Sprout, FileSpreadsheet, Upload } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { Child } from "@shared/schema";
 
 export default function TeacherDashboard() {
@@ -22,6 +26,12 @@ export default function TeacherDashboard() {
   const { toast } = useToast();
 
   const [showAddChild, setShowAddChild] = useState(false);
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [bulkResults, setBulkResults] = useState<{
+    created: number; linked: number; skipped: number; errors: string[];
+  } | null>(null);
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
   const [childName, setChildName] = useState("");
   const [parentEmail, setParentEmail] = useState("");
   const [childBirthday, setChildBirthday] = useState("");
@@ -57,6 +67,39 @@ export default function TeacherDashboard() {
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", "/api/auth/account");
+    },
+    onSuccess: () => {
+      queryClient.setQueryData(["/api/auth/user"], null);
+      window.location.href = "/";
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const bulkUploadMutation = useMutation({
+    mutationFn: async () => {
+      if (!csvFile) throw new Error("No file selected");
+      const text = await csvFile.text();
+      const res = await apiRequest("POST", "/api/teacher/children/bulk", { csvContent: text });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/children"] });
+      setBulkResults(data);
+      toast({
+        title: "Bulk upload complete",
+        description: `${data.created} students added, ${data.linked} linked to parents, ${data.skipped} skipped.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
     },
   });
 
@@ -138,6 +181,17 @@ export default function TeacherDashboard() {
             </button>
             <p className="text-sm text-muted-foreground">Add student</p>
           </div>
+
+          {/* Bulk add via CSV */}
+          <div className="flex flex-col items-center gap-3">
+            <button
+              onClick={() => { setShowBulkUpload(true); setCsvFile(null); setBulkResults(null); }}
+              className="w-24 h-24 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center hover:border-primary hover:bg-primary/5 transition-all"
+            >
+              <FileSpreadsheet className="w-7 h-7 text-muted-foreground/50" />
+            </button>
+            <p className="text-sm text-muted-foreground">Bulk add</p>
+          </div>
         </div>
       </div>
 
@@ -207,6 +261,101 @@ export default function TeacherDashboard() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Account Confirmation */}
+      <AlertDialog open={showDeleteAccount} onOpenChange={setShowDeleteAccount}>
+        <AlertDialogContent className="max-w-[380px] rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-serif">Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove your account and unlink you from all students. Student profiles will remain with their parents.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteAccountMutation.mutate()}
+              className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteAccountMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete Account"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Upload Dialog */}
+      <Dialog open={showBulkUpload} onOpenChange={(open) => { if (!open) { setShowBulkUpload(false); setBulkResults(null); } }}>
+        <DialogContent className="max-w-[380px] rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-serif">Bulk Add Students</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            {!bulkResults ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Upload a CSV file with columns: <strong>name</strong>, <strong>parent email</strong>, and optionally <strong>age</strong> and <strong>birthday</strong>.
+                </p>
+                <div className="border-2 border-dashed border-muted-foreground/30 rounded-xl p-6 text-center">
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={(e) => setCsvFile(e.target.files?.[0] || null)}
+                    className="hidden"
+                    id="csv-upload"
+                  />
+                  <label htmlFor="csv-upload" className="cursor-pointer space-y-2 block">
+                    <Upload className="w-8 h-8 mx-auto text-muted-foreground/50" />
+                    <p className="text-sm text-muted-foreground">
+                      {csvFile ? csvFile.name : "Click to select CSV file"}
+                    </p>
+                  </label>
+                </div>
+                <Button
+                  onClick={() => bulkUploadMutation.mutate()}
+                  disabled={!csvFile || bulkUploadMutation.isPending}
+                  className="w-full rounded-xl"
+                >
+                  {bulkUploadMutation.isPending ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Uploading...</>
+                  ) : (
+                    "Upload & Add Students"
+                  )}
+                </Button>
+              </>
+            ) : (
+              <div className="space-y-3">
+                <div className="bg-primary/5 rounded-xl p-4 space-y-1">
+                  <p className="text-sm"><strong>{bulkResults.created}</strong> students added</p>
+                  <p className="text-sm"><strong>{bulkResults.linked}</strong> linked to existing parents</p>
+                  {bulkResults.skipped > 0 && (
+                    <p className="text-sm text-amber-600"><strong>{bulkResults.skipped}</strong> skipped</p>
+                  )}
+                </div>
+                {bulkResults.errors.length > 0 && (
+                  <div className="text-xs text-muted-foreground space-y-1 max-h-32 overflow-y-auto">
+                    {bulkResults.errors.map((err, i) => (
+                      <p key={i}>{err}</p>
+                    ))}
+                  </div>
+                )}
+                <Button onClick={() => { setShowBulkUpload(false); setBulkResults(null); }} className="w-full rounded-xl">
+                  Done
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete account link */}
+      <div className="px-6 pb-8 text-center">
+        <button
+          onClick={() => setShowDeleteAccount(true)}
+          className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+        >
+          Delete my account
+        </button>
+      </div>
     </div>
   );
 }

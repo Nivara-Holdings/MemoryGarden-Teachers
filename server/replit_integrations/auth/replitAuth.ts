@@ -184,6 +184,74 @@ export async function setupAuth(app: Express) {
     }
   });
 
+  // Simple password reset (no email verification — pilot only)
+  app.post("/api/auth/reset-password", async (req: any, res) => {
+    try {
+      const { email, newPassword } = req.body;
+      if (!email || !newPassword) {
+        return res.status(400).json({ message: "Email and new password are required" });
+      }
+      if (newPassword.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+      const user = await authStorage.getUserByEmail(email.trim().toLowerCase());
+      if (!user) {
+        return res.status(404).json({ message: "No account found with this email" });
+      }
+      if (!user.passwordHash && user.googleId) {
+        return res.status(400).json({ message: "This account uses Google sign-in. Please log in with Google." });
+      }
+      await authStorage.upsertUser({
+        ...user,
+        passwordHash: hashPassword(newPassword),
+      });
+      res.json({ message: "Password updated successfully" });
+    } catch (error) {
+      console.error("Password reset error:", error);
+      res.status(500).json({ message: "Password reset failed" });
+    }
+  });
+
+  // Delete user account
+  app.delete("/api/auth/account", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await authStorage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      if (user.role === "teacher") {
+        // Unlink from all students (don't delete the children)
+        await storage.deleteAllTeacherLinks(userId);
+        // Delete teacher-created memories
+        await storage.deleteMemoriesByParent(userId);
+      } else {
+        // Parent: delete their children and all associated data
+        const userChildren = await storage.getChildrenByParent(userId);
+        for (const child of userChildren) {
+          await storage.deleteMemoriesByChild(child.id);
+          await storage.deleteTeacherLinksByChild(child.id);
+          await storage.deleteCoParentsByChild(child.id);
+          await storage.deleteChild(child.id);
+        }
+        // Delete memories they created as a co-parent
+        await storage.deleteMemoriesByParent(userId);
+        // Remove co-parent links
+        await storage.deleteCoParentsByParent(userId);
+      }
+
+      // Delete user record
+      await authStorage.deleteUser(userId);
+
+      // Destroy session
+      req.session.destroy(() => {
+        res.json({ message: "Account deleted" });
+      });
+    } catch (error) {
+      console.error("Account deletion error:", error);
+      res.status(500).json({ message: "Failed to delete account" });
+    }
+  });
+
   app.get("/api/login", (_req, res) => res.redirect("/"));
   app.get("/api/callback", (_req, res) => res.redirect("/"));
   app.get("/api/logout", (req: any, res) => {

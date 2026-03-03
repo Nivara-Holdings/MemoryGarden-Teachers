@@ -6,7 +6,7 @@ import { Sprout, ArrowLeft, Loader2, Heart, GraduationCap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
-type Screen = "home" | "login" | "signup";
+type Screen = "home" | "login" | "signup" | "forgot-password";
 type Role = "mom" | "dad" | "teacher";
 
 export default function Landing() {
@@ -16,6 +16,9 @@ export default function Landing() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [role, setRole] = useState<Role | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [resetSuccess, setResetSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -69,6 +72,39 @@ export default function Landing() {
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     } catch (error: any) {
       toast({ title: "Registration failed", description: error.message, variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!email) {
+      toast({ title: "Error", description: "Please enter your email", variant: "destructive" });
+      return;
+    }
+    if (!newPassword || newPassword.length < 6) {
+      toast({ title: "Error", description: "Password must be at least 6 characters", variant: "destructive" });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast({ title: "Error", description: "Passwords don't match", variant: "destructive" });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), newPassword }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Reset failed");
+      }
+      setResetSuccess(true);
+      toast({ title: "Password updated", description: "You can now log in with your new password." });
+    } catch (error: any) {
+      toast({ title: "Reset failed", description: error.message, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -158,6 +194,14 @@ export default function Landing() {
             <div className="space-y-2">
               <Label className="text-muted-foreground text-sm">Password</Label>
               <Input type="password" placeholder="Your password" value={password} onChange={(e) => setPassword(e.target.value)} className="py-5 px-4 text-base rounded-xl" onKeyDown={(e) => e.key === "Enter" && handleLogin()} />
+              <div className="text-right pt-1">
+                <span
+                  className="text-xs text-primary cursor-pointer hover:underline"
+                  onClick={() => { setScreen("forgot-password"); setEmail(""); setNewPassword(""); setConfirmPassword(""); setResetSuccess(false); }}
+                >
+                  Forgot password?
+                </span>
+              </div>
             </div>
             <Button onClick={handleLogin} className="w-full py-6 text-base rounded-xl" disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Log In"}
@@ -244,6 +288,53 @@ export default function Landing() {
               </span>
             </p>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (screen === "forgot-password") {
+    return (
+      <div className="min-h-screen bg-background max-w-[430px] mx-auto">
+        <header className="flex items-center gap-4 px-6 py-5">
+          <button onClick={() => { setScreen("login"); setResetSuccess(false); }} className="text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+        </header>
+        <div className="px-8 py-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Sprout className="w-5 h-5 text-primary" />
+            <span className="font-serif text-primary text-sm">Memory Garden</span>
+          </div>
+          <h2 className="text-2xl font-serif mb-2">Reset password</h2>
+          <p className="text-sm text-muted-foreground mb-6">Enter your email and choose a new password.</p>
+
+          {resetSuccess ? (
+            <div className="space-y-4">
+              <p className="text-sm text-primary">Password updated! You can now log in.</p>
+              <Button onClick={() => { setScreen("login"); setResetSuccess(false); setPassword(""); }} className="w-full py-6 text-base rounded-xl">
+                Go to Login
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              <div className="space-y-2">
+                <Label className="text-muted-foreground text-sm">Email</Label>
+                <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="py-5 px-4 text-base rounded-xl" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-muted-foreground text-sm">New Password</Label>
+                <Input type="password" placeholder="At least 6 characters" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="py-5 px-4 text-base rounded-xl" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-muted-foreground text-sm">Confirm Password</Label>
+                <Input type="password" placeholder="Re-enter new password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="py-5 px-4 text-base rounded-xl" onKeyDown={(e) => e.key === "Enter" && handleResetPassword()} />
+              </div>
+              <Button onClick={handleResetPassword} className="w-full py-6 text-base rounded-xl" disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Reset Password"}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     );

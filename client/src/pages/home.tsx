@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Plus, LogOut, Loader2, Camera, Pencil, Sprout } from "lucide-react";
+import { Plus, LogOut, Loader2, Camera, Pencil, Sprout, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 import type { Child } from "@shared/schema";
 
 export default function Home() {
@@ -24,6 +29,9 @@ export default function Home() {
   const [editName, setEditName] = useState("");
   const [editNickname, setEditNickname] = useState("");
   const [editBirthday, setEditBirthday] = useState("");
+  const [deletingChild, setDeletingChild] = useState<Child | null>(null);
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const { toast } = useToast();
 
   const { data: children = [], isLoading } = useQuery<Child[]>({
     queryKey: ["/api/children"],
@@ -37,6 +45,33 @@ export default function Home() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/children"] });
       setEditingChild(null);
+    },
+  });
+
+  const deleteChildMutation = useMutation({
+    mutationFn: async (childId: string) => {
+      await apiRequest("DELETE", `/api/children/${childId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/children"] });
+      setDeletingChild(null);
+      toast({ title: "Profile deleted", description: "The profile and all associated memories have been removed." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", "/api/auth/account");
+    },
+    onSuccess: () => {
+      queryClient.setQueryData(["/api/auth/user"], null);
+      window.location.href = "/";
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -237,9 +272,71 @@ export default function Home() {
             >
               {updateChildMutation.isPending ? "Saving..." : "Save"}
             </Button>
+            <div className="pt-2 border-t">
+              <Button
+                variant="ghost"
+                onClick={() => { setEditingChild(null); setDeletingChild(editingChild); }}
+                className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 rounded-xl text-sm"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete this profile
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Child Confirmation */}
+      <AlertDialog open={!!deletingChild} onOpenChange={(open) => !open && setDeletingChild(null)}>
+        <AlertDialogContent className="max-w-[380px] rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-serif">Delete {deletingChild?.name}'s profile?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all memories, photos, and data for {deletingChild?.name}. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletingChild && deleteChildMutation.mutate(deletingChild.id)}
+              className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteChildMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete Forever"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Account Confirmation */}
+      <AlertDialog open={showDeleteAccount} onOpenChange={setShowDeleteAccount}>
+        <AlertDialogContent className="max-w-[380px] rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-serif">Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete your account, all your children's profiles, and all memories. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteAccountMutation.mutate()}
+              className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteAccountMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete Account"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete account link */}
+      <div className="px-6 pb-8 text-center">
+        <button
+          onClick={() => setShowDeleteAccount(true)}
+          className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+        >
+          Delete my account
+        </button>
+      </div>
     </div>
   );
 }

@@ -31,6 +31,15 @@ export interface IStorage {
   unlinkTeacherFromChild(teacherId: string, childId: string): Promise<void>;
   getTeacherLink(teacherId: string, childId: string): Promise<TeacherChild | undefined>;
 
+  // Cascade delete operations
+  deleteChild(id: string): Promise<void>;
+  deleteMemoriesByChild(childId: string): Promise<void>;
+  deleteMemoriesByParent(parentId: string): Promise<void>;
+  deleteTeacherLinksByChild(childId: string): Promise<void>;
+  deleteAllTeacherLinks(teacherId: string): Promise<void>;
+  deleteCoParentsByChild(childId: string): Promise<void>;
+  deleteCoParentsByParent(parentId: string): Promise<void>;
+
   // Co-Parent links
   getChildrenByCoParent(parentId: string): Promise<Child[]>;
   getCoParentsByChild(childId: string): Promise<CoParent[]>;
@@ -217,6 +226,35 @@ export class DatabaseStorage implements IStorage {
       .update(coParents)
       .set({ parentId })
       .where(and(eq(coParents.email, email), eq(coParents.parentId, null as any)));
+  }
+
+  // ---- Cascade Delete Operations ----
+  async deleteChild(id: string): Promise<void> {
+    await db.delete(children).where(eq(children.id, id));
+  }
+
+  async deleteMemoriesByChild(childId: string): Promise<void> {
+    await db.delete(memories).where(eq(memories.childId, childId));
+  }
+
+  async deleteMemoriesByParent(parentId: string): Promise<void> {
+    await db.delete(memories).where(eq(memories.parentId, parentId));
+  }
+
+  async deleteTeacherLinksByChild(childId: string): Promise<void> {
+    await db.delete(teacherChildren).where(eq(teacherChildren.childId, childId));
+  }
+
+  async deleteAllTeacherLinks(teacherId: string): Promise<void> {
+    await db.delete(teacherChildren).where(eq(teacherChildren.teacherId, teacherId));
+  }
+
+  async deleteCoParentsByChild(childId: string): Promise<void> {
+    await db.delete(coParents).where(eq(coParents.childId, childId));
+  }
+
+  async deleteCoParentsByParent(parentId: string): Promise<void> {
+    await db.delete(coParents).where(eq(coParents.parentId, parentId));
   }
 }
 
