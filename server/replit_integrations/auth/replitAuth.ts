@@ -212,6 +212,26 @@ export async function setupAuth(app: Express) {
     }
   });
 
+  // Update user profile (name, etc.)
+  app.patch("/api/auth/profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await authStorage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      const { firstName, lastName } = req.body;
+      const updated = await authStorage.upsertUser({
+        ...user,
+        firstName: firstName !== undefined ? firstName : user.firstName,
+        lastName: lastName !== undefined ? lastName : user.lastName,
+      });
+      res.json(updated);
+    } catch (error) {
+      console.error("Profile update error:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
   // Delete user account
   app.delete("/api/auth/account", isAuthenticated, async (req: any, res) => {
     try {

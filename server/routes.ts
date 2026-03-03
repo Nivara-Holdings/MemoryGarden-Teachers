@@ -275,14 +275,14 @@ export async function registerRoutes(
     }
   });
 
-  // Update child (profile photo, name, etc.)
+  // Update child (profile photo, name, etc.) — parent or linked teacher
   app.patch("/api/children/:id", isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
-      const parentId = req.user?.claims?.sub;
+      const userId = req.user?.claims?.sub;
       const child = await storage.getChild(id);
       if (!child) return res.status(404).json({ error: "Child not found" });
-      if (child.parentId !== parentId) return res.status(403).json({ error: "Access denied" });
+      if (!await canAccessChild(userId, id)) return res.status(403).json({ error: "Access denied" });
       const updates: Record<string, any> = {};
       const allowedFields = ['name', 'nickname', 'birthday', 'age', 'profilePhoto'] as const;
       for (const field of allowedFields) {
@@ -728,14 +728,18 @@ Rules:
 
       // Parse header row
       const headerRaw = lines[0].toLowerCase().split(",").map((h: string) => h.trim());
+      const firstNameIdx = headerRaw.findIndex((h: string) => h === "first name" || h === "first_name" || h === "firstname");
+      const lastNameIdx = headerRaw.findIndex((h: string) => h === "last name" || h === "last_name" || h === "lastname");
+      // Also support a single "name" column as fallback
       const nameIdx = headerRaw.findIndex((h: string) => h === "name" || h === "child name" || h === "student name" || h === "student");
       const emailIdx = headerRaw.findIndex((h: string) => h === "parent email" || h === "email" || h === "parent_email");
       const birthdayIdx = headerRaw.findIndex((h: string) => h === "birthday" || h === "dob" || h === "date of birth");
       const ageIdx = headerRaw.findIndex((h: string) => h === "age");
 
-      if (nameIdx === -1 || emailIdx === -1) {
+      const hasNameColumn = firstNameIdx !== -1 || nameIdx !== -1;
+      if (!hasNameColumn || emailIdx === -1) {
         return res.status(400).json({
-          error: "CSV must have 'name' and 'parent email' columns in the header row",
+          error: "CSV must have 'first name' (or 'name') and 'parent email' columns in the header row",
         });
       }
 
@@ -743,7 +747,15 @@ Rules:
 
       for (let i = 1; i < lines.length; i++) {
         const cols = lines[i].split(",").map((c: string) => c.trim());
-        const name = cols[nameIdx]?.trim();
+        // Build the child's name: prefer first name column, fall back to single name column
+        let name: string;
+        if (firstNameIdx !== -1) {
+          const firstName = cols[firstNameIdx]?.trim() || "";
+          const lastName = lastNameIdx !== -1 ? (cols[lastNameIdx]?.trim() || "") : "";
+          name = firstName; // Profile uses first name only
+        } else {
+          name = cols[nameIdx]?.trim() || "";
+        }
         const parentEmailVal = cols[emailIdx]?.trim().toLowerCase();
 
         if (!name || !parentEmailVal) {

@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, LogOut, Loader2, Sprout, FileSpreadsheet, Upload } from "lucide-react";
+import { Plus, LogOut, Loader2, Sprout, FileSpreadsheet, Upload, Pencil, Camera } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -32,7 +32,17 @@ export default function TeacherDashboard() {
     created: number; linked: number; skipped: number; errors: string[];
   } | null>(null);
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
-  const [childName, setChildName] = useState("");
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [editFirstName, setEditFirstName] = useState("");
+  const [editLastName, setEditLastName] = useState("");
+  const [editingChild, setEditingChild] = useState<Child | null>(null);
+  const [editChildName, setEditChildName] = useState("");
+  const [editChildNickname, setEditChildNickname] = useState("");
+  const [editChildBirthday, setEditChildBirthday] = useState("");
+  const [uploadingChildId, setUploadingChildId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [childFirstName, setChildFirstName] = useState("");
+  const [childLastName, setChildLastName] = useState("");
   const [parentEmail, setParentEmail] = useState("");
   const [childBirthday, setChildBirthday] = useState("");
   const [childAge, setChildAge] = useState("");
@@ -44,7 +54,7 @@ export default function TeacherDashboard() {
   const addChildMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/teacher/children", {
-        name: childName.trim(),
+        name: childFirstName.trim(),
         parentEmail: parentEmail.trim().toLowerCase(),
         birthday: childBirthday || null,
         age: childAge ? parseInt(childAge) : null,
@@ -54,7 +64,8 @@ export default function TeacherDashboard() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/children"] });
       setShowAddChild(false);
-      setChildName("");
+      setChildFirstName("");
+      setChildLastName("");
       setParentEmail("");
       setChildBirthday("");
       setChildAge("");
@@ -103,6 +114,92 @@ export default function TeacherDashboard() {
     },
   });
 
+  const updateProfileMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PATCH", "/api/auth/profile", {
+        firstName: editFirstName.trim(),
+        lastName: editLastName.trim() || null,
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      setShowEditProfile(false);
+      toast({ title: "Profile updated", description: "Your name has been updated." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateChildMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Record<string, any> }) => {
+      const res = await apiRequest("PATCH", `/api/children/${id}`, updates);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/children"] });
+      setEditingChild(null);
+    },
+  });
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !uploadingChildId) return;
+    try {
+      const urlResponse = await fetch("/api/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+      });
+      if (!urlResponse.ok) throw new Error("Failed to get upload URL");
+      const { uploadURL, objectPath } = await urlResponse.json();
+      const uploadRes = await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      if (!uploadRes.ok) throw new Error("File upload failed");
+      await apiRequest("PATCH", `/api/children/${uploadingChildId}`, { profilePhoto: objectPath });
+      queryClient.invalidateQueries({ queryKey: ["/api/children"] });
+    } catch (err) {
+      console.error("Photo upload failed:", err);
+      toast({ title: "Error", description: "Photo upload failed", variant: "destructive" });
+    } finally {
+      setUploadingChildId(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const triggerPhotoUpload = (childId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setUploadingChildId(childId);
+    fileInputRef.current?.click();
+  };
+
+  const openEditChild = (child: Child, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingChild(child);
+    setEditChildName(child.name);
+    setEditChildNickname((child as any).nickname || "");
+    setEditChildBirthday(child.birthday || "");
+  };
+
+  const handleSaveChildEdit = () => {
+    if (!editingChild || !editChildName.trim()) return;
+    updateChildMutation.mutate({
+      id: editingChild.id,
+      updates: {
+        name: editChildName.trim(),
+        nickname: editChildNickname.trim() || null,
+        birthday: editChildBirthday || null,
+      },
+    });
+  };
+
+  const openEditProfile = () => {
+    setEditFirstName(user?.firstName || "");
+    setEditLastName(user?.lastName || "");
+    setShowEditProfile(true);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -115,6 +212,13 @@ export default function TeacherDashboard() {
 
   return (
     <div className="min-h-screen bg-background" style={{ maxWidth: "430px", margin: "0 auto" }}>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handlePhotoUpload}
+        className="hidden"
+      />
       {/* Warm header area — identical to parent home */}
       <div className="bg-gradient-to-b from-[hsl(var(--sage-light))] to-background px-6 pt-10 pb-8">
         <div className="flex items-center justify-between mb-8">
@@ -130,7 +234,15 @@ export default function TeacherDashboard() {
             <LogOut className="w-5 h-5" />
           </button>
         </div>
-        <h1 className="text-3xl font-serif mb-1">Hi, {firstName}</h1>
+        <h1 className="text-3xl font-serif mb-1">
+          Hi, {firstName}
+          <button
+            onClick={openEditProfile}
+            className="inline-flex ml-2 text-muted-foreground hover:text-primary transition-colors align-middle"
+          >
+            <Pencil className="w-4 h-4" />
+          </button>
+        </h1>
         <p className="text-muted-foreground text-sm">
           {children.length === 0 ? "Add your students to start planting memories" : "Pick a garden to add a memory"}
         </p>
@@ -141,6 +253,7 @@ export default function TeacherDashboard() {
         <div className="flex items-start justify-center gap-10 flex-wrap">
           {children.map((child) => {
             const initial = child.name.charAt(0).toUpperCase();
+            const nickname = (child as any).nickname;
             return (
               <div key={child.id} className="flex flex-col items-center gap-3">
                 <div className="relative">
@@ -160,9 +273,24 @@ export default function TeacherDashboard() {
                       </div>
                     )}
                   </button>
+                  <button
+                    onClick={(e) => triggerPhotoUpload(child.id, e)}
+                    className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-white border border-border shadow-sm flex items-center justify-center hover:bg-muted transition-colors"
+                  >
+                    <Camera className="w-3.5 h-3.5 text-muted-foreground" />
+                  </button>
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-medium">{child.name}</p>
+                  <button
+                    onClick={(e) => openEditChild(child, e)}
+                    className="group flex items-center gap-1 hover:text-primary transition-colors"
+                  >
+                    <p className="text-sm font-medium">{child.name}</p>
+                    <Pencil className="w-3 h-3 text-muted-foreground" />
+                  </button>
+                  {nickname && (
+                    <p className="text-xs text-muted-foreground italic">"{nickname}"</p>
+                  )}
                   {child.age && (
                     <p className="text-xs text-muted-foreground">Age {child.age}</p>
                   )}
@@ -202,14 +330,25 @@ export default function TeacherDashboard() {
             <DialogTitle className="font-serif">Add Student</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
-            <div className="space-y-2">
-              <Label>Child's Name</Label>
-              <Input
-                value={childName}
-                onChange={(e) => setChildName(e.target.value)}
-                placeholder="e.g. Emma"
-                className="rounded-xl"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>First Name</Label>
+                <Input
+                  value={childFirstName}
+                  onChange={(e) => setChildFirstName(e.target.value)}
+                  placeholder="e.g. Emma"
+                  className="rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Last Name</Label>
+                <Input
+                  value={childLastName}
+                  onChange={(e) => setChildLastName(e.target.value)}
+                  placeholder="e.g. Smith"
+                  className="rounded-xl"
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Parent's Email <span className="text-destructive">*</span></Label>
@@ -249,7 +388,7 @@ export default function TeacherDashboard() {
             </div>
             <Button
               onClick={() => addChildMutation.mutate()}
-              disabled={!childName.trim() || !parentEmail.trim() || addChildMutation.isPending}
+              disabled={!childFirstName.trim() || !parentEmail.trim() || addChildMutation.isPending}
               className="w-full rounded-xl"
             >
               {addChildMutation.isPending ? (
@@ -257,6 +396,88 @@ export default function TeacherDashboard() {
               ) : (
                 "Add Student"
               )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Profile Dialog */}
+      <Dialog open={showEditProfile} onOpenChange={setShowEditProfile}>
+        <DialogContent className="max-w-[380px] rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-serif">Edit Profile</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label>First Name</Label>
+              <Input
+                value={editFirstName}
+                onChange={(e) => setEditFirstName(e.target.value)}
+                placeholder="Your first name"
+                className="rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Last Name</Label>
+              <Input
+                value={editLastName}
+                onChange={(e) => setEditLastName(e.target.value)}
+                placeholder="Your last name"
+                className="rounded-xl"
+              />
+            </div>
+            <Button
+              onClick={() => updateProfileMutation.mutate()}
+              disabled={!editFirstName.trim() || updateProfileMutation.isPending}
+              className="w-full rounded-xl"
+            >
+              {updateProfileMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Child Dialog */}
+      <Dialog open={!!editingChild} onOpenChange={(open) => !open && setEditingChild(null)}>
+        <DialogContent className="max-w-[380px] rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-serif">Edit Profile</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label>Name</Label>
+              <Input
+                value={editChildName}
+                onChange={(e) => setEditChildName(e.target.value)}
+                placeholder="Their first name"
+                className="rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Nickname</Label>
+              <Input
+                value={editChildNickname}
+                onChange={(e) => setEditChildNickname(e.target.value)}
+                placeholder="What do you call them? e.g. bug, sunshine"
+                className="rounded-xl"
+              />
+              <p className="text-xs text-muted-foreground">Used by AI when writing memory notes</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Birthday</Label>
+              <Input
+                type="date"
+                value={editChildBirthday}
+                onChange={(e) => setEditChildBirthday(e.target.value)}
+                className="rounded-xl"
+              />
+            </div>
+            <Button
+              onClick={handleSaveChildEdit}
+              disabled={!editChildName.trim() || updateChildMutation.isPending}
+              className="w-full rounded-xl"
+            >
+              {updateChildMutation.isPending ? "Saving..." : "Save"}
             </Button>
           </div>
         </DialogContent>
@@ -293,7 +514,7 @@ export default function TeacherDashboard() {
             {!bulkResults ? (
               <>
                 <p className="text-sm text-muted-foreground">
-                  Upload a CSV file with columns: <strong>name</strong>, <strong>parent email</strong>, and optionally <strong>age</strong> and <strong>birthday</strong>.
+                  Upload a CSV file with columns: <strong>first name</strong>, <strong>last name</strong>, <strong>parent email</strong>, and optionally <strong>age</strong> and <strong>birthday</strong>.
                 </p>
                 <div className="border-2 border-dashed border-muted-foreground/30 rounded-xl p-6 text-center">
                   <input
