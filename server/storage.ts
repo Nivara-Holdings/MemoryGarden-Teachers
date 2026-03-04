@@ -76,7 +76,7 @@ export class DatabaseStorage implements IStorage {
     const id = randomUUID();
     const [memory] = await db
       .insert(memories)
-      .values({ 
+      .values({
         id,
         type: insertMemory.type,
         rawNote: insertMemory.rawNote,
@@ -87,6 +87,7 @@ export class DatabaseStorage implements IStorage {
         shared: insertMemory.shared,
         from: insertMemory.from,
         duration: insertMemory.duration,
+        audioUrl: insertMemory.audioUrl,
         source: insertMemory.source,
         keepsakeType: insertMemory.keepsakeType,
         childId: insertMemory.childId,
