@@ -88,7 +88,7 @@ export async function registerRoutes(
       const { eq, and } = await import("drizzle-orm");
       // Get all teacher links
       const links = await db.select().from(teacherChildren);
-      const teacherIds = [...new Set(links.map(l => l.teacherId))];
+      const teacherIds = Array.from(new Set(links.map(l => l.teacherId)));
       if (teacherIds.length === 0) return res.json({ updated: 0 });
       // Update each teacher's memories with their actual name
       let updated = 0;
@@ -184,6 +184,20 @@ export async function registerRoutes(
       if (req.body.childId && !await canAccessChild(parentId, req.body.childId)) {
         return res.status(403).json({ error: "Access denied" });
       }
+
+      // If user is a teacher, set proper "from" name and source
+      const currentUser = await authStorage.getUser(parentId);
+      if (currentUser?.role === "teacher") {
+        let teacherName = currentUser.firstName
+          ? `${currentUser.firstName}${currentUser.lastName ? ' ' + currentUser.lastName : ''}`
+          : "Teacher";
+        if (currentUser.schoolName) {
+          teacherName += `, ${currentUser.schoolName}`;
+        }
+        req.body.from = teacherName;
+        req.body.source = req.body.source || "teacher";
+      }
+
       const validatedData = insertMemorySchema.parse({ ...req.body, parentId });
       const memory = await storage.createMemory(validatedData);
       res.status(201).json(memory);
