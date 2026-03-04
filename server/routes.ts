@@ -80,21 +80,30 @@ export async function registerRoutes(
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
 
-  // Fix teacher memories: set from/source for memories created by teachers
+  // Fix teacher memories: set actual teacher names on from field
   app.patch("/api/admin/fix-teacher-memories", isAuthenticated, async (req: any, res) => {
     try {
       const { db } = await import("./db");
       const { memories, teacherChildren } = await import("@shared/schema");
-      const { eq, inArray } = await import("drizzle-orm");
-      // Get all teacher user IDs
+      const { eq, and } = await import("drizzle-orm");
+      // Get all teacher links
       const links = await db.select().from(teacherChildren);
       const teacherIds = [...new Set(links.map(l => l.teacherId))];
       if (teacherIds.length === 0) return res.json({ updated: 0 });
-      // Update memories created by teachers
-      const result = await db.update(memories)
-        .set({ from: "Teacher", source: "teacher" })
-        .where(inArray(memories.parentId, teacherIds));
-      res.json({ updated: "done", teacherIds });
+      // Update each teacher's memories with their actual name
+      let updated = 0;
+      for (const tid of teacherIds) {
+        const teacher = await authStorage.getUser(tid);
+        let name = teacher?.firstName
+          ? `${teacher.firstName}${teacher.lastName ? ' ' + teacher.lastName : ''}`
+          : "Teacher";
+        if (teacher?.schoolName) name += `, ${teacher.schoolName}`;
+        await db.update(memories)
+          .set({ from: name, source: "teacher" })
+          .where(eq(memories.parentId, tid));
+        updated++;
+      }
+      res.json({ updated, teacherIds });
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });
   // ---- END ADMIN ----

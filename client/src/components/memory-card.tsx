@@ -302,11 +302,6 @@ export default function MemoryCard({ memory, isChildView = false, isTeacherView 
   if (memory.type === "voiceMemo") {
     return (
       <div data-testid={`card-memory-${memory.id}`} className="relative">
-        {!memory.shared && (
-          <div className="absolute top-3 right-3 z-10">
-            <Lock className="w-4 h-4 text-muted-foreground" />
-          </div>
-        )}
         <VoiceMemoPlayer memory={memory} isChildView={isChildView} />
         {showActions && (
           <div className="flex items-center justify-end gap-1 mt-2">
@@ -333,12 +328,6 @@ export default function MemoryCard({ memory, isChildView = false, isTeacherView 
 
   return (
     <Card className={`${config.bgClass} border ${config.borderClass} p-5 relative`} data-testid={`card-memory-${memory.id}`}>
-      {!memory.shared && (
-        <div className="absolute top-3 right-3">
-          <Lock className="w-4 h-4 text-muted-foreground" />
-        </div>
-      )}
-      
       <div className={`flex items-center gap-2 text-sm font-medium ${config.accentClass} mb-3`}>
         <Icon className="w-4 h-4" />
         {memory.type === "fromOthers" || (isFromTeacher && !isTeacherView) ? `From ${memory.from}` : config.label}
