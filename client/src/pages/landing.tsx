@@ -16,6 +16,7 @@ export default function Landing() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [role, setRole] = useState<Role | null>(null);
+  const [schoolName, setSchoolName] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [resetSuccess, setResetSuccess] = useState(false);
@@ -63,7 +64,7 @@ export default function Landing() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email, password, firstName, lastName, role }),
+        body: JSON.stringify({ email, password, firstName, lastName, role, schoolName: role === "teacher" ? schoolName : undefined }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -270,6 +271,12 @@ export default function Landing() {
                 <Input type="text" placeholder="Last" value={lastName} onChange={(e) => setLastName(e.target.value)} className="py-5 px-4 text-base rounded-xl" />
               </div>
             </div>
+            {role === "teacher" && (
+              <div className="space-y-2">
+                <Label className="text-muted-foreground text-sm">School / Organization</Label>
+                <Input type="text" placeholder="e.g. Camp Sunshine, Lincoln Elementary" value={schoolName} onChange={(e) => setSchoolName(e.target.value)} className="py-5 px-4 text-base rounded-xl" />
+              </div>
+            )}
             <div className="space-y-2">
               <Label className="text-muted-foreground text-sm">Email</Label>
               <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="py-5 px-4 text-base rounded-xl" />

@@ -346,6 +346,7 @@ export default function Garden() {
                         <MemoryCard
                           key={memory.id}
                           memory={memory}
+                          isTeacherView={isTeacher}
                           onEdit={handleEdit}
                           onDelete={handleDelete}
                           onTogglePrivacy={handleTogglePrivacy}

@@ -7,6 +7,7 @@ import type { Memory } from "@shared/schema";
 interface MemoryCardProps {
   memory: Memory;
   isChildView?: boolean;
+  isTeacherView?: boolean;
   onEdit?: (memory: Memory) => void;
   onDelete?: (memoryId: string) => void;
   onTogglePrivacy?: (memoryId: string, shared: boolean) => void;
@@ -290,7 +291,7 @@ function AudioPlayer({ url, duration }: { url: string; duration?: string | null 
   );
 }
 
-export default function MemoryCard({ memory, isChildView = false, onEdit, onDelete, onTogglePrivacy }: MemoryCardProps) {
+export default function MemoryCard({ memory, isChildView = false, isTeacherView = false, onEdit, onDelete, onTogglePrivacy }: MemoryCardProps) {
   const isFromTeacher = memory.from?.toLowerCase() === "teacher" || memory.source === "teacher";
   const config = isFromTeacher
     ? memoryTypeConfig.teacher
@@ -340,7 +341,7 @@ export default function MemoryCard({ memory, isChildView = false, onEdit, onDele
       
       <div className={`flex items-center gap-2 text-sm font-medium ${config.accentClass} mb-3`}>
         <Icon className="w-4 h-4" />
-        {memory.type === "fromOthers" || isFromTeacher ? `From ${memory.from}` : config.label}
+        {memory.type === "fromOthers" || (isFromTeacher && !isTeacherView) ? `From ${memory.from}` : config.label}
         {memory.source && !isFromTeacher && <span className="text-muted-foreground font-normal">({memory.source})</span>}
       </div>
 

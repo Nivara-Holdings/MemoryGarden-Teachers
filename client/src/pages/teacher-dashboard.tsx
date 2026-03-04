@@ -32,6 +32,7 @@ export default function TeacherDashboard() {
     created: number; linked: number; skipped: number; errors: string[];
   } | null>(null);
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [showDeleteChild, setShowDeleteChild] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [editFirstName, setEditFirstName] = useState("");
   const [editLastName, setEditLastName] = useState("");
@@ -88,6 +89,21 @@ export default function TeacherDashboard() {
     onSuccess: () => {
       queryClient.setQueryData(["/api/auth/user"], null);
       window.location.href = "/";
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteChildMutation = useMutation({
+    mutationFn: async (childId: string) => {
+      await apiRequest("DELETE", `/api/teacher/children/${childId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/children"] });
+      setEditingChild(null);
+      setShowDeleteChild(false);
+      toast({ title: "Student removed from your list" });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -479,9 +495,36 @@ export default function TeacherDashboard() {
             >
               {updateChildMutation.isPending ? "Saving..." : "Save"}
             </Button>
+            <button
+              onClick={() => setShowDeleteChild(true)}
+              className="w-full text-sm text-destructive hover:underline pt-1"
+            >
+              Remove this student
+            </button>
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Child Confirmation */}
+      <AlertDialog open={showDeleteChild} onOpenChange={setShowDeleteChild}>
+        <AlertDialogContent className="max-w-[380px] rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-serif">Remove student?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will unlink {editingChild?.name} from your list. The student's profile and memories from their parent will not be affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => editingChild && deleteChildMutation.mutate(editingChild.id)}
+              className="bg-destructive hover:bg-destructive/90 rounded-xl"
+            >
+              {deleteChildMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Remove"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Delete Account Confirmation */}
       <AlertDialog open={showDeleteAccount} onOpenChange={setShowDeleteAccount}>

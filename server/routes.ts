@@ -955,6 +955,15 @@ Rules:
       const link = await storage.getTeacherLink(teacherId, childId);
       if (!link) return res.status(403).json({ error: "Access denied" });
 
+      // Get teacher's actual name + school for the "from" field
+      const teacher = await authStorage.getUser(teacherId);
+      let teacherName = teacher?.firstName
+        ? `${teacher.firstName}${teacher.lastName ? ' ' + teacher.lastName : ''}`
+        : "Teacher";
+      if (teacher?.schoolName) {
+        teacherName += `, ${teacher.schoolName}`;
+      }
+
       const memory = await storage.createMemory({
         type: type || "moment",
         rawNote,
@@ -963,7 +972,7 @@ Rules:
         mediaUrl: null,
         mediaType: null,
         shared: true,
-        from: "Teacher",
+        from: teacherName,
         duration: null,
         source: source || "teacher",
         keepsakeType: null,

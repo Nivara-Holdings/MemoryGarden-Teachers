@@ -66,7 +66,7 @@ export async function setupAuth(app: Express) {
   // Email/Password Registration
   app.post("/api/auth/register", async (req: any, res) => {
     try {
-      const { email, password, firstName, lastName, role } = req.body;
+      const { email, password, firstName, lastName, role, schoolName } = req.body;
       if (!email || !password) {
         return res.status(400).json({ message: "Email and password are required" });
       }
@@ -85,6 +85,7 @@ export async function setupAuth(app: Express) {
         lastName: lastName || null,
         profileImageUrl: null,
         role: role || null,
+        schoolName: role === "teacher" ? (schoolName || null) : null,
       });
       req.session.userId = user.id;
 

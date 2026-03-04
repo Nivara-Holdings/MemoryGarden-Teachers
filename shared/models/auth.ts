@@ -23,6 +23,7 @@ export const users = pgTable("users", {
   profileImageUrl: varchar("profile_image_url"),
   googleId: varchar("google_id").unique(),
   role: varchar("role").$type<UserRole>(),
+  schoolName: varchar("school_name"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
