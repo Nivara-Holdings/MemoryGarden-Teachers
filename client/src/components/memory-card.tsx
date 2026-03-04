@@ -324,7 +324,9 @@ export default function MemoryCard({ memory, isChildView = false, isTeacherView 
     <Card className={`${config.bgClass} border ${config.borderClass} p-5 relative`} data-testid={`card-memory-${memory.id}`}>
       <div className={`flex items-center gap-2 text-sm font-medium ${config.accentClass} mb-3`}>
         <Icon className="w-4 h-4" />
-        {memory.type === "fromOthers" || (isFromTeacher && !isTeacherView) ? `From ${memory.from}` : config.label}
+        {isFromTeacher
+          ? (isTeacherView ? config.label : `From ${memory.from}`)
+          : (memory.type === "fromOthers" ? `From ${memory.from}` : config.label)}
         {memory.source && !isFromTeacher && <span className="text-muted-foreground font-normal">({memory.source})</span>}
       </div>
 
