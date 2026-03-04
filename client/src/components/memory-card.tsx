@@ -47,7 +47,7 @@ const memoryTypeConfig = {
     accentClass: "text-[hsl(var(--sky-dark))]",
     borderClass: "border-[hsl(var(--sky-dark)/0.3)]",
     icon: MessageCircle,
-    label: "From Teacher",
+    label: "Moment",
   },
 };
 
