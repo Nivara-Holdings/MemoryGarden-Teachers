@@ -1,7 +1,7 @@
 import { Resend } from "resend";
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-const fromEmail = process.env.EMAIL_FROM || "Memory Garden <no-reply@memory-garden.ai>";
+const fromEmail = process.env.EMAIL_FROM || "Memory Garden <onboarding@resend.dev>";
 const appUrl = process.env.APP_URL || "https://www.memory-garden.ai";
 
 async function sendEmail(to: string, subject: string, html: string) {
