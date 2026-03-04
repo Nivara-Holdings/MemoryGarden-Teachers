@@ -444,6 +444,47 @@ export async function registerRoutes(
     }
   });
 
+  // Transcribe audio using OpenAI Whisper
+  app.post("/api/transcribe", isAuthenticated, async (req: any, res) => {
+    try {
+      const { audioUrl } = req.body;
+      if (!audioUrl) return res.status(400).json({ error: "Audio URL is required" });
+
+      const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+      if (!apiKey) return res.status(400).json({ error: "OpenAI API key not configured" });
+
+      // Fetch the audio file
+      const audioPath = audioUrl.startsWith("/uploads/")
+        ? path.join(uploadsDir, audioUrl.replace("/uploads/", ""))
+        : null;
+
+      let audioBuffer: Buffer;
+      if (audioPath && fs.existsSync(audioPath)) {
+        audioBuffer = fs.readFileSync(audioPath);
+      } else {
+        // Try fetching as full URL
+        const fullUrl = audioUrl.startsWith("http") ? audioUrl : `${req.protocol}://${req.get("host")}${audioUrl}`;
+        const response = await fetch(fullUrl);
+        if (!response.ok) return res.status(400).json({ error: "Could not fetch audio file" });
+        audioBuffer = Buffer.from(await response.arrayBuffer());
+      }
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({ apiKey });
+
+      const file = new File([audioBuffer], "audio.webm", { type: "audio/webm" });
+      const transcription = await openai.audio.transcriptions.create({
+        model: "whisper-1",
+        file,
+      });
+
+      res.json({ text: transcription.text });
+    } catch (error) {
+      console.error("Transcription error:", error);
+      res.status(500).json({ error: "Transcription failed" });
+    }
+  });
+
   // Note refinement using Anthropic Claude
   app.post("/api/refine-note", isAuthenticated, async (req: any, res) => {
     try {

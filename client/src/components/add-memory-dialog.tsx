@@ -54,12 +54,13 @@ export default function AddMemoryDialog({ open, onOpenChange, onSubmit, childId,
   const audioChunksRef = useRef<Blob[]>([]);
   const recognitionRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const gotBrowserTranscript = useRef(false);
 
   const resetState = () => {
     setNote(""); setRefinedNote(""); setCategory("moment"); setFrom(defaultFrom);
     setIsRecording(false); setRecordingTime(0); setMediaUrls([]);
     setMemoryDate(new Date().toISOString().split('T')[0]);
-    setIsTranscribing(false); setSaveVoice(true); setAudioUrl(null); setPolishingStyle(null);
+    setIsTranscribing(false); setSaveVoice(true); setAudioUrl(null); setPolishingStyle(null); gotBrowserTranscript.current = false;
     if (timerRef.current) clearInterval(timerRef.current);
     if (recognitionRef.current) { try { recognitionRef.current.stop(); } catch (e) {} }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") { try { mediaRecorderRef.current.stop(); } catch (e) {} }
@@ -79,43 +80,65 @@ export default function AddMemoryDialog({ open, onOpenChange, onSubmit, childId,
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
+      gotBrowserTranscript.current = false;
       mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach(track => track.stop());
-        if (saveVoice) {
-          const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-          if (audioBlob.size > 0) {
-            try {
-              const urlResponse = await fetch("/api/uploads/request-url", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ name: "voice-memo.webm", size: audioBlob.size, contentType: "audio/webm" }) });
-              if (urlResponse.ok) {
-                const { uploadURL, objectPath } = await urlResponse.json();
-                await fetch(uploadURL, { method: "PUT", body: audioBlob, headers: { "Content-Type": "audio/webm" } });
-                setAudioUrl(objectPath);
-              }
-            } catch (err) { console.error("Audio upload failed:", err); }
-          }
+        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        let uploadedPath: string | null = null;
+
+        if (audioBlob.size > 0) {
+          try {
+            const urlResponse = await fetch("/api/uploads/request-url", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ name: "voice-memo.webm", size: audioBlob.size, contentType: "audio/webm" }) });
+            if (urlResponse.ok) {
+              const { uploadURL, objectPath } = await urlResponse.json();
+              await fetch(uploadURL, { method: "PUT", body: audioBlob, headers: { "Content-Type": "audio/webm" } });
+              uploadedPath = objectPath;
+              setAudioUrl(objectPath);
+            }
+          } catch (err) { console.error("Audio upload failed:", err); }
+        }
+
+        // Auto-transcribe server-side if browser didn't capture text
+        if (uploadedPath && !gotBrowserTranscript.current) {
+          setIsTranscribing(true);
+          try {
+            const res = await fetch("/api/transcribe", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ audioUrl: uploadedPath }) });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.text) setNote(data.text);
+            }
+          } catch (err) { console.error("Server transcription failed:", err); }
+          finally { setIsTranscribing(false); }
         }
       };
       mediaRecorder.start();
 
+      // Try browser SpeechRecognition (works on some devices)
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true; recognition.interimResults = true; recognition.lang = "en-US";
-        recognitionRef.current = recognition;
-        let finalTranscript = "";
-        recognition.onresult = (event: any) => {
-          let interim = "";
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + " ";
-            else interim += event.results[i][0].transcript;
-          }
-          setNote((finalTranscript + interim).trim());
-        };
-        recognition.onerror = (event: any) => { if (event.error === "no-speech") { try { recognition.start(); } catch (e) {} } };
-        recognition.onend = () => { if (isRecording && mediaRecorderRef.current?.state === "recording") { try { recognition.start(); } catch (e) {} } };
-        recognition.start();
-        setIsTranscribing(true);
+        try {
+          const recognition = new SpeechRecognition();
+          recognition.continuous = true; recognition.interimResults = true; recognition.lang = "en-US";
+          recognitionRef.current = recognition;
+          let finalTranscript = "";
+          recognition.onresult = (event: any) => {
+            let interim = "";
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+              if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + " ";
+              else interim += event.results[i][0].transcript;
+            }
+            const text = (finalTranscript + interim).trim();
+            if (text) gotBrowserTranscript.current = true;
+            setNote(text);
+          };
+          recognition.onerror = (event: any) => { if (event.error === "no-speech") { try { recognition.start(); } catch (e) {} } };
+          recognition.onend = () => { if (isRecording && mediaRecorderRef.current?.state === "recording") { try { recognition.start(); } catch (e) {} } };
+          recognition.start();
+          setIsTranscribing(true);
+        } catch (e) {
+          console.log("SpeechRecognition failed to start:", e);
+        }
       }
 
       setRecordingTime(0);
@@ -188,17 +211,18 @@ export default function AddMemoryDialog({ open, onOpenChange, onSubmit, childId,
   const handleSubmit = () => {
     const selectedDate = new Date(memoryDate + 'T00:00:00');
     const dateStr = selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    const finalMediaUrl = mediaUrls.length > 0 ? mediaUrls.join(",") : (audioUrl || null);
-    const finalMediaType = mediaUrls.length > 0 ? "image" : (audioUrl ? "audio" : null);
+    const savedAudio = saveVoice ? audioUrl : null;
+    const finalMediaUrl = mediaUrls.length > 0 ? mediaUrls.join(",") : (savedAudio || null);
+    const finalMediaType = mediaUrls.length > 0 ? "image" : (savedAudio ? "audio" : null);
     const selectedCat = categories.find(c => c.key === category);
 
     onSubmit({
       type: category === "keepsake" ? "keepsake" : "moment",
       rawNote: note, refinedNote: refinedNote || null, date: dateStr, shared: true, from, childId,
       mediaUrl: finalMediaUrl, mediaType: finalMediaType,
-      audioUrl: mediaUrls.length > 0 && audioUrl ? audioUrl : null,
+      audioUrl: mediaUrls.length > 0 && savedAudio ? savedAudio : null,
       source: isTeacher ? "teacher" : (selectedCat ? `${selectedCat.emoji} ${selectedCat.label}` : null),
-      ...(audioUrl && { duration: `${Math.floor(recordingTime / 60)}:${String(recordingTime % 60).padStart(2, "0")}` }),
+      ...(savedAudio && { duration: `${Math.floor(recordingTime / 60)}:${String(recordingTime % 60).padStart(2, "0")}` }),
     });
     resetState();
     onOpenChange(false);
@@ -258,7 +282,7 @@ export default function AddMemoryDialog({ open, onOpenChange, onSubmit, childId,
               </button>
             </div>
             {isTranscribing && (
-              <span className="text-xs text-primary animate-pulse">Listening...</span>
+              <span className="text-xs text-primary animate-pulse">{isRecording ? "Listening..." : "Transcribing..."}</span>
             )}
             <Textarea
               placeholder="Write your memory here..."
