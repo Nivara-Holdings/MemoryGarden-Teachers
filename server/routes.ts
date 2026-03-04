@@ -1026,6 +1026,16 @@ Rules:
       if (!link) return res.status(404).json({ error: "Child not linked to you" });
 
       await storage.unlinkTeacherFromChild(teacherId, childId);
+
+      // If teacher was the temporary parent (no real parent signed up yet),
+      // also delete the child and their memories since nobody else owns them
+      const child = await storage.getChild(childId);
+      if (child && child.parentId === teacherId) {
+        await storage.deleteMemoriesByChild(childId);
+        await storage.deleteCoParentsByChild(childId);
+        await storage.deleteChild(childId);
+      }
+
       res.status(204).send();
     } catch (error) {
       console.error("Error removing teacher child:", error);
