@@ -27,8 +27,9 @@ async function sendEmail(to: string, subject: string, html: string) {
   }
 }
 
+// When a teacher adds a child and the parent isn't on the app yet
 export function sendParentInviteEmail(parentEmail: string, childName: string, teacherName: string) {
-  const subject = `${teacherName} is capturing moments for ${childName} on Memory Garden`;
+  const subject = `${childName}'s moments are being captured on Memory Garden`;
   const html = `
     <div style="font-family: Georgia, serif; max-width: 500px; margin: 0 auto; padding: 24px;">
       <h2 style="color: #2d5016;">Memory Garden</h2>
@@ -42,29 +43,32 @@ export function sendParentInviteEmail(parentEmail: string, childName: string, te
   sendEmail(parentEmail, subject, html);
 }
 
+// When a teacher adds a child and the parent already has an account
 export function sendChildLinkedEmail(parentEmail: string, childName: string, teacherName: string) {
-  const subject = `${teacherName} is now connected to ${childName}'s Memory Garden`;
+  const subject = `${teacherName} is now capturing ${childName}'s moments`;
   const html = `
     <div style="font-family: Georgia, serif; max-width: 500px; margin: 0 auto; padding: 24px;">
       <h2 style="color: #2d5016;">Memory Garden</h2>
       <p>Hi there,</p>
-      <p><strong>${teacherName}</strong> is now connected to <strong>${childName}</strong>'s garden and can capture moments from their time together.</p>
-      <p>Check your garden to see new moments as they come in:</p>
-      <p><a href="${appUrl}" style="display: inline-block; background: #2d5016; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none;">Open Memory Garden</a></p>
+      <p><strong>${teacherName}</strong> just connected to <strong>${childName}</strong>'s garden and can now capture moments from their time together.</p>
+      <p>You'll start seeing moments from ${teacherName} in ${childName}'s garden as they happen:</p>
+      <p><a href="${appUrl}" style="display: inline-block; background: #2d5016; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none;">Open ${childName}'s Garden</a></p>
     </div>
   `;
   sendEmail(parentEmail, subject, html);
 }
 
+// When a parent invites the other parent (co-parent) to join
 export function sendCoParentInviteEmail(coParentEmail: string, childName: string, inviterName: string) {
-  const subject = `You've been invited to ${childName}'s Memory Garden`;
+  const subject = `${inviterName} wants you to see ${childName}'s moments`;
   const html = `
     <div style="font-family: Georgia, serif; max-width: 500px; margin: 0 auto; padding: 24px;">
       <h2 style="color: #2d5016;">Memory Garden</h2>
       <p>Hi there,</p>
-      <p><strong>${inviterName}</strong> has invited you to see <strong>${childName}</strong>'s Memory Garden — a place where every person in ${childName}'s life captures the moments that matter.</p>
-      <p><a href="${appUrl}" style="display: inline-block; background: #2d5016; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none;">Join Memory Garden</a></p>
-      <p style="color: #666; font-size: 14px;">Sign up with this email (${coParentEmail}) to connect automatically.</p>
+      <p><strong>${inviterName}</strong> has been collecting precious moments from <strong>${childName}</strong>'s life — from school, activities, and home — and wants you to be part of it too.</p>
+      <p>Memory Garden is the one place where teachers, coaches, and family all capture the moments you'd otherwise miss. Join to see ${childName}'s story as it unfolds:</p>
+      <p><a href="${appUrl}" style="display: inline-block; background: #2d5016; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none;">Join ${childName}'s Garden</a></p>
+      <p style="color: #666; font-size: 14px;">Sign up with this email (${coParentEmail}) and you'll be connected to ${childName}'s garden automatically.</p>
     </div>
   `;
   sendEmail(coParentEmail, subject, html);

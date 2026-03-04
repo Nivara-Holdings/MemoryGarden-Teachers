@@ -9,7 +9,7 @@ import { randomUUID } from "crypto";
 import path from "path";
 import fs from "fs";
 import sharp from "sharp";
-import { sendChildLinkedEmail, sendParentInviteEmail, sendCoParentInviteEmail } from "./email";
+import { sendParentInviteEmail, sendChildLinkedEmail, sendCoParentInviteEmail } from "./email";
 
 export async function registerRoutes(
   httpServer: Server,
