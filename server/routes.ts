@@ -9,6 +9,7 @@ import { randomUUID } from "crypto";
 import path from "path";
 import fs from "fs";
 import sharp from "sharp";
+import { sendChildLinkedEmail, sendParentInviteEmail, sendCoParentInviteEmail } from "./email";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -356,6 +357,12 @@ export async function registerRoutes(
         normalizedEmail, childId, userId, invitee?.id || undefined
       );
 
+      // Send invite email
+      const inviter = await authStorage.getUser(userId);
+      const inviterName = inviter?.firstName ? `${inviter.firstName}${inviter.lastName ? ' ' + inviter.lastName : ''}` : "A parent";
+      const childName = child?.name || "your child";
+      sendCoParentInviteEmail(normalizedEmail, childName, inviterName);
+
       res.status(201).json({
         ...invite,
         linked: !!invitee,
@@ -702,6 +709,15 @@ Rules:
         await storage.linkTeacherToChild(teacherId, child.id);
       }
 
+      // Send email to parent (fire-and-forget)
+      const teacher = await authStorage.getUser(teacherId);
+      const teacherName = teacher?.firstName ? `${teacher.firstName}${teacher.lastName ? ' ' + teacher.lastName : ''}` : "A teacher";
+      if (parentLinked) {
+        sendChildLinkedEmail(parentEmail, name, teacherName);
+      } else {
+        sendParentInviteEmail(parentEmail, name, teacherName);
+      }
+
       res.status(201).json({
         ...child,
         parentLinked,
@@ -721,18 +737,38 @@ Rules:
         return res.status(400).json({ error: "CSV content is required" });
       }
 
+      // Parse CSV properly handling quoted fields (commas inside quotes)
+      function parseCSVLine(line: string): string[] {
+        const fields: string[] = [];
+        let current = "";
+        let inQuotes = false;
+        for (let j = 0; j < line.length; j++) {
+          const ch = line[j];
+          if (ch === '"') {
+            inQuotes = !inQuotes;
+          } else if (ch === ',' && !inQuotes) {
+            fields.push(current.trim());
+            current = "";
+          } else {
+            current += ch;
+          }
+        }
+        fields.push(current.trim());
+        return fields;
+      }
+
       const lines = csvContent.split(/\r?\n/).filter((line: string) => line.trim());
       if (lines.length < 2) {
         return res.status(400).json({ error: "CSV must have a header row and at least one data row" });
       }
 
       // Parse header row
-      const headerRaw = lines[0].toLowerCase().split(",").map((h: string) => h.trim());
+      const headerRaw = parseCSVLine(lines[0]).map((h: string) => h.toLowerCase());
       const firstNameIdx = headerRaw.findIndex((h: string) => h === "first name" || h === "first_name" || h === "firstname");
       const lastNameIdx = headerRaw.findIndex((h: string) => h === "last name" || h === "last_name" || h === "lastname");
       // Also support a single "name" column as fallback
       const nameIdx = headerRaw.findIndex((h: string) => h === "name" || h === "child name" || h === "student name" || h === "student");
-      const emailIdx = headerRaw.findIndex((h: string) => h === "parent email" || h === "email" || h === "parent_email");
+      const emailIdx = headerRaw.findIndex((h: string) => h === "parent email" || h === "parent emails" || h === "email" || h === "emails" || h === "parent_email" || h === "parent_emails");
       const birthdayIdx = headerRaw.findIndex((h: string) => h === "birthday" || h === "dob" || h === "date of birth");
       const ageIdx = headerRaw.findIndex((h: string) => h === "age");
 
@@ -745,8 +781,14 @@ Rules:
 
       const results = { created: 0, linked: 0, skipped: 0, errors: [] as string[] };
 
+      // Get teacher name once for emails
+      const teacher = await authStorage.getUser(teacherId);
+      const teacherName = teacher?.firstName ? `${teacher.firstName}${teacher.lastName ? ' ' + teacher.lastName : ''}` : "A teacher";
+      // Track emails already sent this batch to avoid duplicates per parent
+      const emailsSent = new Set<string>();
+
       for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(",").map((c: string) => c.trim());
+        const cols = parseCSVLine(lines[i]);
         // Build the child's name: prefer first name column, fall back to single name column
         let name: string;
         if (firstNameIdx !== -1) {
@@ -756,16 +798,23 @@ Rules:
         } else {
           name = cols[nameIdx]?.trim() || "";
         }
-        const parentEmailVal = cols[emailIdx]?.trim().toLowerCase();
 
-        if (!name || !parentEmailVal) {
+        // Support multiple parent emails (comma or semicolon separated within the field)
+        const rawEmails = cols[emailIdx]?.trim() || "";
+        const parentEmails = rawEmails
+          .split(/[;,]/)
+          .map((e: string) => e.trim().toLowerCase())
+          .filter((e: string) => e.length > 0);
+
+        if (!name || parentEmails.length === 0) {
           results.errors.push(`Row ${i + 1}: missing name or parent email`);
           results.skipped++;
           continue;
         }
 
-        if (!parentEmailVal.includes("@")) {
-          results.errors.push(`Row ${i + 1}: invalid email "${parentEmailVal}"`);
+        const invalidEmail = parentEmails.find((e: string) => !e.includes("@"));
+        if (invalidEmail) {
+          results.errors.push(`Row ${i + 1}: invalid email "${invalidEmail}"`);
           results.skipped++;
           continue;
         }
@@ -774,8 +823,12 @@ Rules:
         const ageStr = ageIdx !== -1 ? cols[ageIdx]?.trim() : null;
         const age = ageStr ? parseInt(ageStr) : null;
 
+        // First email is the primary parent, rest are co-parents
+        const primaryEmail = parentEmails[0];
+        const coParentEmails = parentEmails.slice(1);
+
         try {
-          const existingParent = await authStorage.getUserByEmail(parentEmailVal);
+          const existingParent = await authStorage.getUserByEmail(primaryEmail);
           let child;
           let parentLinked = false;
 
@@ -788,7 +841,7 @@ Rules:
               child = existingChild;
             } else {
               child = await storage.createChild({
-                name, parentId: existingParent.id, parentEmail: parentEmailVal,
+                name, parentId: existingParent.id, parentEmail: primaryEmail,
                 nickname: null, birthday: birthday || null,
                 viewMode: "device", age: (age !== null && !isNaN(age)) ? age : null, profilePhoto: null,
               });
@@ -797,7 +850,7 @@ Rules:
             results.linked++;
           } else {
             child = await storage.createChild({
-              name, parentId: teacherId, parentEmail: parentEmailVal,
+              name, parentId: teacherId, parentEmail: primaryEmail,
               nickname: null, birthday: birthday || null,
               viewMode: "device", age: (age !== null && !isNaN(age)) ? age : null, profilePhoto: null,
             });
@@ -807,6 +860,36 @@ Rules:
           if (!existingLink) {
             await storage.linkTeacherToChild(teacherId, child.id);
           }
+
+          // Add co-parents for this child
+          for (const coEmail of coParentEmails) {
+            const existingCoParent = await storage.getCoParentByEmail(coEmail, child.id);
+            if (!existingCoParent) {
+              const coParentUser = await authStorage.getUserByEmail(coEmail);
+              await storage.inviteCoParent(coEmail, child.id, teacherId, coParentUser?.id);
+            }
+            // Send co-parent email
+            if (!emailsSent.has(coEmail)) {
+              emailsSent.add(coEmail);
+              const coParentUser = await authStorage.getUserByEmail(coEmail);
+              if (coParentUser) {
+                sendChildLinkedEmail(coEmail, name, teacherName);
+              } else {
+                sendParentInviteEmail(coEmail, name, teacherName);
+              }
+            }
+          }
+
+          // Send primary parent email
+          if (!emailsSent.has(primaryEmail)) {
+            emailsSent.add(primaryEmail);
+            if (parentLinked) {
+              sendChildLinkedEmail(primaryEmail, name, teacherName);
+            } else {
+              sendParentInviteEmail(primaryEmail, name, teacherName);
+            }
+          }
+
           results.created++;
         } catch (rowError: any) {
           results.errors.push(`Row ${i + 1} (${name}): ${rowError.message}`);

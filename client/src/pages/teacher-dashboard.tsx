@@ -514,7 +514,7 @@ export default function TeacherDashboard() {
             {!bulkResults ? (
               <>
                 <p className="text-sm text-muted-foreground">
-                  Upload a CSV file with columns: <strong>first name</strong>, <strong>last name</strong>, <strong>parent email</strong>, and optionally <strong>age</strong> and <strong>birthday</strong>.
+                  Upload a CSV file with columns: <strong>first name</strong>, <strong>last name</strong>, <strong>parent emails</strong>, and optionally <strong>age</strong> and <strong>birthday</strong>. For two parents, separate emails with a comma (e.g. <em>"mom@email.com, dad@email.com"</em>).
                 </p>
                 <div className="border-2 border-dashed border-muted-foreground/30 rounded-xl p-6 text-center">
                   <input
