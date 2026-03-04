@@ -85,32 +85,40 @@ export default function AddMemoryDialog({ open, onOpenChange, onSubmit, childId,
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach(track => track.stop());
         const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        let uploadedPath: string | null = null;
+        if (audioBlob.size === 0) return;
 
-        if (audioBlob.size > 0) {
+        // Run upload and transcription in parallel (no waiting for upload before transcribing)
+        const uploadPromise = (async () => {
           try {
             const urlResponse = await fetch("/api/uploads/request-url", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ name: "voice-memo.webm", size: audioBlob.size, contentType: "audio/webm" }) });
             if (urlResponse.ok) {
               const { uploadURL, objectPath } = await urlResponse.json();
               await fetch(uploadURL, { method: "PUT", body: audioBlob, headers: { "Content-Type": "audio/webm" } });
-              uploadedPath = objectPath;
               setAudioUrl(objectPath);
             }
           } catch (err) { console.error("Audio upload failed:", err); }
-        }
+        })();
 
-        // Auto-transcribe server-side if browser didn't capture text
-        if (uploadedPath && !gotBrowserTranscript.current) {
+        // Send audio directly as base64 for transcription (no need to wait for upload)
+        const transcribePromise = (async () => {
+          if (gotBrowserTranscript.current) return;
           setIsTranscribing(true);
           try {
-            const res = await fetch("/api/transcribe", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ audioUrl: uploadedPath }) });
+            const reader = new FileReader();
+            const base64 = await new Promise<string>((resolve) => {
+              reader.onloadend = () => resolve((reader.result as string).split(",")[1]);
+              reader.readAsDataURL(audioBlob);
+            });
+            const res = await fetch("/api/transcribe", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ audioBase64: base64 }) });
             if (res.ok) {
               const data = await res.json();
               if (data.text) setNote(data.text);
             }
           } catch (err) { console.error("Server transcription failed:", err); }
           finally { setIsTranscribing(false); }
-        }
+        })();
+
+        await Promise.all([uploadPromise, transcribePromise]);
       };
       mediaRecorder.start();
 

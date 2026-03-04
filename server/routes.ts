@@ -444,29 +444,30 @@ export async function registerRoutes(
     }
   });
 
-  // Transcribe audio using OpenAI Whisper
+  // Transcribe audio using OpenAI Whisper (accepts base64 audio directly)
   app.post("/api/transcribe", isAuthenticated, async (req: any, res) => {
     try {
-      const { audioUrl } = req.body;
-      if (!audioUrl) return res.status(400).json({ error: "Audio URL is required" });
+      const { audioBase64, audioUrl } = req.body;
+      if (!audioBase64 && !audioUrl) return res.status(400).json({ error: "Audio data is required" });
 
       const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
       if (!apiKey) return res.status(400).json({ error: "OpenAI API key not configured" });
 
-      // Fetch the audio file
-      const audioPath = audioUrl.startsWith("/uploads/")
-        ? path.join(uploadsDir, audioUrl.replace("/uploads/", ""))
-        : null;
-
       let audioBuffer: Buffer;
-      if (audioPath && fs.existsSync(audioPath)) {
-        audioBuffer = fs.readFileSync(audioPath);
+      if (audioBase64) {
+        audioBuffer = Buffer.from(audioBase64, "base64");
       } else {
-        // Try fetching as full URL
-        const fullUrl = audioUrl.startsWith("http") ? audioUrl : `${req.protocol}://${req.get("host")}${audioUrl}`;
-        const response = await fetch(fullUrl);
-        if (!response.ok) return res.status(400).json({ error: "Could not fetch audio file" });
-        audioBuffer = Buffer.from(await response.arrayBuffer());
+        const audioPath = audioUrl.startsWith("/uploads/")
+          ? path.join(uploadsDir, audioUrl.replace("/uploads/", ""))
+          : null;
+        if (audioPath && fs.existsSync(audioPath)) {
+          audioBuffer = fs.readFileSync(audioPath);
+        } else {
+          const fullUrl = audioUrl.startsWith("http") ? audioUrl : `${req.protocol}://${req.get("host")}${audioUrl}`;
+          const response = await fetch(fullUrl);
+          if (!response.ok) return res.status(400).json({ error: "Could not fetch audio file" });
+          audioBuffer = Buffer.from(await response.arrayBuffer());
+        }
       }
 
       const OpenAI = (await import("openai")).default;
