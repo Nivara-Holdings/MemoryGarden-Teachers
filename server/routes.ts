@@ -347,12 +347,6 @@ export async function registerRoutes(
 
       const normalizedEmail = email.trim().toLowerCase();
 
-      // Check if already invited
-      const existing = await storage.getCoParentByEmail(normalizedEmail, childId);
-      if (existing) {
-        return res.status(400).json({ error: "This person has already been invited" });
-      }
-
       // Check if this is the child's primary parent email
       const child = await storage.getChild(childId);
       const primaryParent = child ? await authStorage.getUser(child.parentId) : null;
@@ -360,16 +354,22 @@ export async function registerRoutes(
         return res.status(400).json({ error: "This person is already the primary parent" });
       }
 
-      // Check if invitee already has an account
+      // Check if already invited — if so, just re-send the email
+      const existing = await storage.getCoParentByEmail(normalizedEmail, childId);
+
       const invitee = await authStorage.getUserByEmail(normalizedEmail);
-      const invite = await storage.inviteCoParent(
-        normalizedEmail, childId, userId, invitee?.id || undefined
-      );
+      let invite = existing;
+      if (!existing) {
+        invite = await storage.inviteCoParent(
+          normalizedEmail, childId, userId, invitee?.id || undefined
+        );
+      }
 
       // Send email
       const inviter = await authStorage.getUser(userId);
       const inviterName = inviter?.firstName ? `${inviter.firstName}${inviter.lastName ? ' ' + inviter.lastName : ''}` : "A parent";
       const childName = child?.name || "your child";
+      console.log(`[Co-Parent Invite] Sending email to ${normalizedEmail}, inviter: ${inviterName}, child: ${childName}, hasAccount: ${!!invitee}`);
       if (invitee) {
         sendChildLinkedEmail(normalizedEmail, childName, inviterName);
       } else {
@@ -379,6 +379,7 @@ export async function registerRoutes(
       res.status(201).json({
         ...invite,
         linked: !!invitee,
+        resent: !!existing,
       });
     } catch (error) {
       console.error("Error inviting co-parent:", error);
