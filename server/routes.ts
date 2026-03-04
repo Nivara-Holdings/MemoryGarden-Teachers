@@ -231,7 +231,7 @@ export async function registerRoutes(
     }
   });
 
-  // Delete memory (only your own)
+  // Delete memory (parent deletes permanently, teacher just hides from their view)
   app.delete("/api/memories/:id", isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
@@ -239,7 +239,19 @@ export async function registerRoutes(
       const memory = await storage.getMemory(id);
       if (!memory) return res.status(404).json({ error: "Memory not found" });
       if (memory.parentId !== userId) return res.status(403).json({ error: "Access denied" });
-      await storage.deleteMemory(id);
+
+      // Check if user is a teacher for this child
+      const isTeacher = await isTeacherForChild(userId, memory.childId);
+      if (isTeacher) {
+        // Teacher "delete" = reassign to the child's parent so parent keeps the memory
+        const child = await storage.getChild(memory.childId);
+        if (child) {
+          await storage.updateMemory(id, { parentId: child.parentId });
+        }
+      } else {
+        // Parent delete = permanent
+        await storage.deleteMemory(id);
+      }
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting memory:", error);

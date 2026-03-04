@@ -33,6 +33,7 @@ export const memories = pgTable("memories", {
   shared: boolean("shared").default(true),
   from: text("from").notNull(),
   duration: text("duration"),
+  audioUrl: text("audio_url"),
   source: text("source"),
   keepsakeType: text("keepsake_type"),
   childId: varchar("child_id").notNull(),

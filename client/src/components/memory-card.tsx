@@ -340,6 +340,12 @@ export default function MemoryCard({ memory, isChildView = false, isTeacherView 
         </div>
       )}
 
+      {memory.audioUrl && memory.mediaType === "image" && (
+        <div className="mb-4">
+          <AudioPlayer url={memory.audioUrl} duration={memory.duration} />
+        </div>
+      )}
+
       <p className={`leading-relaxed italic text-foreground ${isChildView ? "text-lg" : "text-base"}`}>
         "{memory.refinedNote || memory.rawNote}"
       </p>

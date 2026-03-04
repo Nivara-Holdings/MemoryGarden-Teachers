@@ -188,14 +188,15 @@ export default function AddMemoryDialog({ open, onOpenChange, onSubmit, childId,
   const handleSubmit = () => {
     const selectedDate = new Date(memoryDate + 'T00:00:00');
     const dateStr = selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    const finalMediaUrl = mediaUrls.length > 0 ? mediaUrls.join(",") : audioUrl;
-    const finalMediaType = mediaUrls.length > 0 ? "image" : audioUrl ? "audio" : null;
+    const finalMediaUrl = mediaUrls.length > 0 ? mediaUrls.join(",") : (audioUrl || null);
+    const finalMediaType = mediaUrls.length > 0 ? "image" : (audioUrl ? "audio" : null);
     const selectedCat = categories.find(c => c.key === category);
 
     onSubmit({
       type: category === "keepsake" ? "keepsake" : "moment",
       rawNote: note, refinedNote: refinedNote || null, date: dateStr, shared: true, from, childId,
       mediaUrl: finalMediaUrl, mediaType: finalMediaType,
+      audioUrl: mediaUrls.length > 0 && audioUrl ? audioUrl : null,
       source: isTeacher ? "teacher" : (selectedCat ? `${selectedCat.emoji} ${selectedCat.label}` : null),
       ...(audioUrl && { duration: `${Math.floor(recordingTime / 60)}:${String(recordingTime % 60).padStart(2, "0")}` }),
     });
