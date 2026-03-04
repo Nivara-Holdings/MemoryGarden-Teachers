@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Heart, MessageCircle, Award, Mic, Play, Pause, ChevronDown, ChevronUp, Pencil, Trash2, Lock, Unlock } from "lucide-react";
+import { Heart, MessageCircle, Award, Mic, Play, Pause, ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
 import type { Memory } from "@shared/schema";
 
 interface MemoryCardProps {
@@ -10,7 +10,6 @@ interface MemoryCardProps {
   isTeacherView?: boolean;
   onEdit?: (memory: Memory) => void;
   onDelete?: (memoryId: string) => void;
-  onTogglePrivacy?: (memoryId: string, shared: boolean) => void;
 }
 
 const memoryTypeConfig = {
@@ -291,13 +290,13 @@ function AudioPlayer({ url, duration }: { url: string; duration?: string | null 
   );
 }
 
-export default function MemoryCard({ memory, isChildView = false, isTeacherView = false, onEdit, onDelete, onTogglePrivacy }: MemoryCardProps) {
+export default function MemoryCard({ memory, isChildView = false, isTeacherView = false, onEdit, onDelete }: MemoryCardProps) {
   const isFromTeacher = memory.from?.toLowerCase() === "teacher" || memory.source === "teacher";
   const config = isFromTeacher
     ? memoryTypeConfig.teacher
     : (memoryTypeConfig[memory.type] || memoryTypeConfig.moment);
   const Icon = config.icon;
-  const showActions = !isChildView && (onEdit || onDelete || onTogglePrivacy);
+  const showActions = !isChildView && (onEdit || onDelete);
 
   if (memory.type === "voiceMemo") {
     return (
@@ -305,11 +304,6 @@ export default function MemoryCard({ memory, isChildView = false, isTeacherView 
         <VoiceMemoPlayer memory={memory} isChildView={isChildView} />
         {showActions && (
           <div className="flex items-center justify-end gap-1 mt-2">
-            {onTogglePrivacy && (
-              <Button size="icon" variant="ghost" onClick={() => onTogglePrivacy(memory.id, !memory.shared)} className="h-8 w-8">
-                {memory.shared ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-              </Button>
-            )}
             {onEdit && (
               <Button size="icon" variant="ghost" onClick={() => onEdit(memory)} className="h-8 w-8">
                 <Pencil className="w-4 h-4" />
@@ -357,11 +351,6 @@ export default function MemoryCard({ memory, isChildView = false, isTeacherView 
         <div className="flex items-center gap-1">
           {showActions ? (
             <>
-              {onTogglePrivacy && (
-                <Button size="icon" variant="ghost" onClick={() => onTogglePrivacy(memory.id, !memory.shared)} className="h-8 w-8">
-                  {memory.shared ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                </Button>
-              )}
               {onEdit && (
                 <Button size="icon" variant="ghost" onClick={() => onEdit(memory)} className="h-8 w-8">
                   <Pencil className="w-4 h-4" />
@@ -382,24 +371,18 @@ export default function MemoryCard({ memory, isChildView = false, isTeacherView 
   );
 }
 
-export function FeaturedVoiceMemo({ memory, onEdit, onDelete, onTogglePrivacy }: { 
-  memory: Memory; 
+export function FeaturedVoiceMemo({ memory, onEdit, onDelete }: {
+  memory: Memory;
   onEdit?: (memory: Memory) => void;
   onDelete?: (memoryId: string) => void;
-  onTogglePrivacy?: (memoryId: string, shared: boolean) => void;
 }) {
-  const showActions = onEdit || onDelete || onTogglePrivacy;
+  const showActions = onEdit || onDelete;
   return (
     <Card className="bg-[hsl(var(--coral))] border border-[hsl(var(--coral-dark)/0.5)] overflow-hidden relative">
       <div className="p-5 relative">
         <VoiceMemoPlayer memory={memory} />
         {showActions && (
           <div className="flex items-center justify-end gap-1 mt-2">
-            {onTogglePrivacy && (
-              <Button size="icon" variant="ghost" onClick={() => onTogglePrivacy(memory.id, !memory.shared)} className="h-8 w-8">
-                {memory.shared ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-              </Button>
-            )}
             {onEdit && (
               <Button size="icon" variant="ghost" onClick={() => onEdit(memory)} className="h-8 w-8">
                 <Pencil className="w-4 h-4" />

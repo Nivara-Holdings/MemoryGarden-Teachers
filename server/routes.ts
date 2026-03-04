@@ -366,11 +366,15 @@ export async function registerRoutes(
         normalizedEmail, childId, userId, invitee?.id || undefined
       );
 
-      // Send invite email
+      // Send email
       const inviter = await authStorage.getUser(userId);
       const inviterName = inviter?.firstName ? `${inviter.firstName}${inviter.lastName ? ' ' + inviter.lastName : ''}` : "A parent";
       const childName = child?.name || "your child";
-      sendCoParentInviteEmail(normalizedEmail, childName, inviterName);
+      if (invitee) {
+        sendChildLinkedEmail(normalizedEmail, childName, inviterName);
+      } else {
+        sendCoParentInviteEmail(normalizedEmail, childName, inviterName);
+      }
 
       res.status(201).json({
         ...invite,
@@ -423,10 +427,34 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Anthropic API key not configured. Add ANTHROPIC_API_KEY to your .env file." });
       }
 
+      // Detect if user is a teacher
+      const userId = req.user?.claims?.sub;
+      const currentUser = await authStorage.getUser(userId);
+      const isTeacher = currentUser?.role === "teacher";
+
       const childRef = childName ? ` named ${childName}` : '';
       const nicknameRef = childNickname ? ` (nickname: "${childNickname}")` : '';
-      
-      const systemPrompt = `You are a gentle writing assistant for Memory Garden — an app where parents plant memories for their children. These memories form a living garden that grows with the child. A child might read this today, at age 10, at 15, or at 30. These words help them understand who they are, how special they are, how far they've come, and how deeply they are loved. Humans are made of memories — and you are helping preserve the most important ones.
+
+      const teacherName = isTeacher && currentUser?.firstName
+        ? `${currentUser.firstName}${currentUser.lastName ? ' ' + currentUser.lastName : ''}`
+        : "the teacher";
+
+      const systemPrompt = isTeacher
+        ? `You are a writing assistant for Memory Garden — an app where teachers, coaches, and instructors capture moments they witness about the children they work with. These moments are shared with the child's parents, who would otherwise never know about them.
+
+You are writing for ${teacherName}, a teacher/instructor, about a child${childRef}${nicknameRef}. The teacher quickly captured what they saw — your job is to polish it into a warm, clear note that a parent would love to read.
+
+GUARDRAILS:
+- Write in third person — as the teacher describing what they observed. Example: "${childName || 'They'} did their first full lap today without stopping."
+- A CHILD and their PARENT will read this. Every word matters.
+- NEVER add negative, critical, or embarrassing content about the child.
+- NEVER invent details, events, or emotions that weren't in the original note.
+- NEVER make it overly dramatic or artificially sentimental.
+- Keep it natural — like a teacher telling a parent something great they saw.
+- Keep output length proportional to input length. Short input = short output.
+- If the input is 1-5 words, expand slightly to be a clear sentence but don't over-embellish.
+- Return ONLY the refined text. No preamble, no quotes, no explanation.`
+        : `You are a gentle writing assistant for Memory Garden — an app where parents plant memories for their children. These memories form a living garden that grows with the child. A child might read this today, at age 10, at 15, or at 30. These words help them understand who they are, how special they are, how far they've come, and how deeply they are loved. Humans are made of memories — and you are helping preserve the most important ones.
 
 You are writing for a parent about their child${childRef}${nicknameRef}.${childNickname ? ` The parent sometimes calls their child "${childNickname}" — you may use this nickname naturally if it fits, but don't force it.` : ''}
 
@@ -443,10 +471,15 @@ GUARDRAILS:
 - If the input is 1-5 words, return it with minimal changes.
 - Return ONLY the refined text. No preamble, no quotes, no explanation.`;
 
-      const prompts: Record<string, string> = {
-        fix: `Fix only grammar, spelling, and punctuation in this parent's note about their child${childRef}. Do NOT change meaning, tone, or add words. If 1-3 words, return unchanged.`,
-        polish: `Gently clean up this parent's note about their child${childRef}. Fix grammar, smooth wording, add a touch of warmth — but keep their natural voice. Do NOT expand short notes into long paragraphs. Do NOT add details that weren't there. The child will read this someday, so make it feel loving but honest.`,
-      };
+      const prompts: Record<string, string> = isTeacher
+        ? {
+            fix: `Fix only grammar, spelling, and punctuation in this teacher's note about ${childRef || 'a child'}. Do NOT change meaning, tone, or add words. If 1-3 words, return unchanged.`,
+            polish: `Polish this teacher's quick note about ${childRef || 'a child'} into a warm, clear observation that a parent would love to read. Keep the teacher's voice natural. Do NOT expand short notes into long paragraphs. Do NOT add details that weren't there.`,
+          }
+        : {
+            fix: `Fix only grammar, spelling, and punctuation in this parent's note about their child${childRef}. Do NOT change meaning, tone, or add words. If 1-3 words, return unchanged.`,
+            polish: `Gently clean up this parent's note about their child${childRef}. Fix grammar, smooth wording, add a touch of warmth — but keep their natural voice. Do NOT expand short notes into long paragraphs. Do NOT add details that weren't there. The child will read this someday, so make it feel loving but honest.`,
+          };
 
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",

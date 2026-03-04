@@ -133,9 +133,6 @@ export default function Garden() {
     setDeletingMemoryId(memoryId);
   };
 
-  const handleTogglePrivacy = (memoryId: string, shared: boolean) => {
-    updateMemoryMutation.mutate({ id: memoryId, updates: { shared } });
-  };
 
   const confirmDelete = () => {
     if (deletingMemoryId) {
@@ -349,7 +346,6 @@ export default function Garden() {
                           isTeacherView={isTeacher}
                           onEdit={handleEdit}
                           onDelete={handleDelete}
-                          onTogglePrivacy={handleTogglePrivacy}
                         />
                       ))}
                     </div>
