@@ -738,7 +738,7 @@ Rules:
       }
 
       // Parse CSV properly handling quoted fields (commas inside quotes)
-      function parseCSVLine(line: string): string[] {
+      const parseCSVLine = (line: string): string[] => {
         const fields: string[] = [];
         let current = "";
         let inQuotes = false;
@@ -755,7 +755,7 @@ Rules:
         }
         fields.push(current.trim());
         return fields;
-      }
+      };
 
       const lines = csvContent.split(/\r?\n/).filter((line: string) => line.trim());
       if (lines.length < 2) {
