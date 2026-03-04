@@ -1,26 +1,16 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
-const smtpUser = process.env.SMTP_USER;
-const smtpPass = process.env.SMTP_PASS;
-const fromEmail = process.env.EMAIL_FROM || smtpUser || "";
-const appUrl = process.env.APP_URL || "http://localhost:5000";
-
-const transporter = smtpUser && smtpPass
-  ? nodemailer.createTransport({
-      host: "smtp.office365.com",
-      port: 587,
-      secure: false,
-      auth: { user: smtpUser, pass: smtpPass },
-    })
-  : null;
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+const fromEmail = process.env.EMAIL_FROM || "Memory Garden <no-reply@memory-garden.ai>";
+const appUrl = process.env.APP_URL || "https://www.memory-garden.ai";
 
 async function sendEmail(to: string, subject: string, html: string) {
-  if (!transporter) {
-    console.log(`[Email] No SMTP credentials — skipping email to ${to}: ${subject}`);
+  if (!resend) {
+    console.log(`[Email] No RESEND_API_KEY — skipping email to ${to}: ${subject}`);
     return;
   }
   try {
-    await transporter.sendMail({ from: fromEmail, to, subject, html });
+    await resend.emails.send({ from: fromEmail, to, subject, html });
     console.log(`[Email] Sent to ${to}: ${subject}`);
   } catch (error) {
     console.error(`[Email] Failed to send to ${to}:`, error);
