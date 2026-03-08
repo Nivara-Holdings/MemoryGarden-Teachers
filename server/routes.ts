@@ -749,9 +749,9 @@ Rules:
         }
         parentLinked = true;
       } else {
-        // No parent account yet — create child under teacher temporarily
+        // No parent account yet — create unclaimed child until parent signs up
         child = await storage.createChild({
-          name, parentId: teacherId, parentEmail,
+          name, parentId: "unclaimed", parentEmail,
           nickname: null, birthday: birthday || null,
           viewMode: "device", age: age || null, profilePhoto: null,
         });
@@ -931,7 +931,7 @@ Rules:
             results.linked++;
           } else {
             child = await storage.createChild({
-              name, parentId: teacherId, parentEmail: primaryEmail,
+              name, parentId: "unclaimed", parentEmail: primaryEmail,
               nickname: null, birthday: birthday || null,
               viewMode: "device", age: (age !== null && !isNaN(age)) ? age : null, profilePhoto: null,
             });
