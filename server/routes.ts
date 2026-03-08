@@ -51,63 +51,6 @@ export async function registerRoutes(
     return !!link;
   }
 
-  // ---- ADMIN: Cleanup duplicate children (remove after use) ----
-  app.get("/api/admin/children", isAuthenticated, async (req: any, res) => {
-    try {
-      const { db } = await import("./db");
-      const { children, memories, teacherChildren } = await import("@shared/schema");
-      const { sql } = await import("drizzle-orm");
-      const all = await db.select().from(children);
-      const memCounts = await db.select({ 
-        childId: memories.childId, 
-        count: sql<number>`count(*)::int` 
-      }).from(memories).groupBy(memories.childId);
-      const links = await db.select().from(teacherChildren);
-      res.json({ children: all, memoryCounts: memCounts, teacherLinks: links });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.delete("/api/admin/children/:id", isAuthenticated, async (req: any, res) => {
-    try {
-      const { id } = req.params;
-      const { db } = await import("./db");
-      const { children, memories, teacherChildren } = await import("@shared/schema");
-      const { eq } = await import("drizzle-orm");
-      await db.delete(teacherChildren).where(eq(teacherChildren.childId, id));
-      await db.delete(memories).where(eq(memories.childId, id));
-      await db.delete(children).where(eq(children.id, id));
-      res.json({ deleted: id });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  // Fix teacher memories: set actual teacher names on from field
-  app.patch("/api/admin/fix-teacher-memories", isAuthenticated, async (req: any, res) => {
-    try {
-      const { db } = await import("./db");
-      const { memories, teacherChildren } = await import("@shared/schema");
-      const { eq, and } = await import("drizzle-orm");
-      // Get all teacher links
-      const links = await db.select().from(teacherChildren);
-      const teacherIds = Array.from(new Set(links.map(l => l.teacherId)));
-      if (teacherIds.length === 0) return res.json({ updated: 0 });
-      // Update each teacher's memories with their actual name
-      let updated = 0;
-      for (const tid of teacherIds) {
-        const teacher = await authStorage.getUser(tid);
-        let name = teacher?.firstName
-          ? `${teacher.firstName}${teacher.lastName ? ' ' + teacher.lastName : ''}`
-          : "Teacher";
-        if (teacher?.schoolName) name += `, ${teacher.schoolName}`;
-        await db.update(memories)
-          .set({ from: name, source: "teacher" })
-          .where(eq(memories.parentId, tid));
-        updated++;
-      }
-      res.json({ updated, teacherIds });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-  // ---- END ADMIN ----
-
   // Upload request URL (replaces Replit Object Storage)
   app.post("/api/uploads/request-url", isAuthenticated, (req: any, res) => {
     try {
