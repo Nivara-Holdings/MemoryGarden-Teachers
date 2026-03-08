@@ -838,8 +838,26 @@ Rules:
       // Get teacher name once for emails
       const teacher = await authStorage.getUser(teacherId);
       const teacherName = teacher?.firstName ? `${teacher.firstName}${teacher.lastName ? ' ' + teacher.lastName : ''}` : "A teacher";
-      // Track emails already sent this batch to avoid duplicates per parent
+      // Track unique child+parent combos to skip duplicate CSV rows
+      const seenChildren = new Set<string>();
+      // Track emails already sent this batch to avoid duplicates per parent+child
       const emailsSent = new Set<string>();
+      // Cache parent lookups by email to avoid redundant DB calls across rows
+      const parentCache = new Map<string, Awaited<ReturnType<typeof authStorage.getUserByEmail>>>();
+      const childrenCache = new Map<string, Awaited<ReturnType<typeof storage.getChildrenByParent>>>();
+
+      async function getCachedUser(email: string) {
+        if (!parentCache.has(email)) {
+          parentCache.set(email, await authStorage.getUserByEmail(email));
+        }
+        return parentCache.get(email)!;
+      }
+      async function getCachedChildren(parentId: string) {
+        if (!childrenCache.has(parentId)) {
+          childrenCache.set(parentId, await storage.getChildrenByParent(parentId));
+        }
+        return childrenCache.get(parentId)!;
+      }
 
       for (let i = 1; i < lines.length; i++) {
         const cols = parseCSVLine(lines[i]);
@@ -873,21 +891,29 @@ Rules:
           continue;
         }
 
+        // Skip duplicate child+parent email rows
+        const primaryEmail = parentEmails[0];
+        const childKey = `${name.toLowerCase().trim()}:${primaryEmail}`;
+        if (seenChildren.has(childKey)) {
+          results.skipped++;
+          continue;
+        }
+        seenChildren.add(childKey);
+
         const birthday = birthdayIdx !== -1 ? (cols[birthdayIdx]?.trim() || null) : null;
         const ageStr = ageIdx !== -1 ? cols[ageIdx]?.trim() : null;
         const age = ageStr ? parseInt(ageStr) : null;
 
         // First email is the primary parent, rest are co-parents
-        const primaryEmail = parentEmails[0];
         const coParentEmails = parentEmails.slice(1);
 
         try {
-          const existingParent = await authStorage.getUserByEmail(primaryEmail);
+          const existingParent = await getCachedUser(primaryEmail);
           let child;
           let parentLinked = false;
 
           if (existingParent) {
-            const parentChildren = await storage.getChildrenByParent(existingParent.id);
+            const parentChildren = await getCachedChildren(existingParent.id);
             const existingChild = parentChildren.find(
               (c) => c.name.toLowerCase().trim() === name.toLowerCase().trim()
             );
@@ -899,6 +925,7 @@ Rules:
                 nickname: null, birthday: birthday || null,
                 viewMode: "device", age: (age !== null && !isNaN(age)) ? age : null, profilePhoto: null,
               });
+              childrenCache.delete(existingParent.id); // invalidate so next sibling sees this child
             }
             parentLinked = true;
             results.linked++;
@@ -917,15 +944,15 @@ Rules:
 
           // Add co-parents for this child
           for (const coEmail of coParentEmails) {
+            const coParentUser = await getCachedUser(coEmail);
             const existingCoParent = await storage.getCoParentByEmail(coEmail, child.id);
             if (!existingCoParent) {
-              const coParentUser = await authStorage.getUserByEmail(coEmail);
               await storage.inviteCoParent(coEmail, child.id, teacherId, coParentUser?.id);
             }
-            // Send co-parent email
-            if (!emailsSent.has(coEmail)) {
-              emailsSent.add(coEmail);
-              const coParentUser = await authStorage.getUserByEmail(coEmail);
+            // Send co-parent email (dedup by email+child so siblings each trigger an email)
+            const coKey = `${coEmail}:${child.id}`;
+            if (!emailsSent.has(coKey)) {
+              emailsSent.add(coKey);
               if (coParentUser) {
                 sendChildLinkedEmail(coEmail, name, teacherName);
               } else {
@@ -934,9 +961,10 @@ Rules:
             }
           }
 
-          // Send primary parent email
-          if (!emailsSent.has(primaryEmail)) {
-            emailsSent.add(primaryEmail);
+          // Send primary parent email (dedup by email+child so siblings each trigger an email)
+          const primaryKey = `${primaryEmail}:${child.id}`;
+          if (!emailsSent.has(primaryKey)) {
+            emailsSent.add(primaryKey);
             if (parentLinked) {
               sendChildLinkedEmail(primaryEmail, name, teacherName);
             } else {
