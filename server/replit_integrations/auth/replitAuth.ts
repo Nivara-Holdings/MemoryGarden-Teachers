@@ -241,9 +241,7 @@ export async function setupAuth(app: Express) {
       if (!user) return res.status(404).json({ message: "User not found" });
 
       if (user.role === "teacher") {
-        // Unlink from all students (don't delete the children)
         await storage.deleteAllTeacherLinks(userId);
-        // Delete teacher-created memories
         await storage.deleteMemoriesByParent(userId);
       } else {
         // Parent: delete their children and all associated data
@@ -254,17 +252,16 @@ export async function setupAuth(app: Express) {
           await storage.deleteCoParentsByChild(child.id);
           await storage.deleteChild(child.id);
         }
-        // Delete memories they created as a co-parent
         await storage.deleteMemoriesByParent(userId);
-        // Remove co-parent links
         await storage.deleteCoParentsByParent(userId);
       }
 
-      // Delete user record
+      // Delete user record first, then destroy session
       await authStorage.deleteUser(userId);
+      console.log(`[Account] Deleted user ${userId} (${user.email})`);
 
-      // Destroy session
-      req.session.destroy(() => {
+      req.session.destroy((err: any) => {
+        if (err) console.error("[Account] Session destroy error:", err);
         res.json({ message: "Account deleted" });
       });
     } catch (error) {
