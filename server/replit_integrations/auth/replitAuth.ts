@@ -66,7 +66,8 @@ export async function setupAuth(app: Express) {
   // Email/Password Registration
   app.post("/api/auth/register", async (req: any, res) => {
     try {
-      const { email, password, firstName, lastName, role, schoolName } = req.body;
+      const { email: rawEmail, password, firstName, lastName, role, schoolName } = req.body;
+      const email = rawEmail?.trim().toLowerCase();
       if (!email || !password) {
         return res.status(400).json({ message: "Email and password are required" });
       }
@@ -104,7 +105,8 @@ export async function setupAuth(app: Express) {
   // Email/Password Login
   app.post("/api/auth/login", async (req: any, res) => {
     try {
-      const { email, password } = req.body;
+      const { email: rawEmail, password } = req.body;
+      const email = rawEmail?.trim().toLowerCase();
       if (!email || !password) {
         return res.status(400).json({ message: "Email and password are required" });
       }
@@ -133,7 +135,8 @@ export async function setupAuth(app: Express) {
       const payload = JSON.parse(
         Buffer.from(credential.split(".")[1], "base64").toString()
       );
-      const { sub: googleId, email, given_name, family_name, picture } = payload;
+      const { sub: googleId, email: rawGoogleEmail, given_name, family_name, picture } = payload;
+      const email = rawGoogleEmail?.trim().toLowerCase();
       let user = await authStorage.getUserByGoogleId(googleId);
       if (!user) {
         user = await authStorage.getUserByEmail(email);

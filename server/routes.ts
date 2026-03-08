@@ -718,7 +718,8 @@ Rules:
   app.post("/api/teacher/children", isAuthenticated, async (req: any, res) => {
     try {
       const teacherId = req.user?.claims?.sub;
-      const { name, parentEmail, birthday, age } = req.body;
+      const { name, parentEmail: rawEmail, birthday, age } = req.body;
+      const parentEmail = rawEmail?.trim().toLowerCase();
       if (!name || !parentEmail) {
         return res.status(400).json({ error: "Child name and parent email are required" });
       }
