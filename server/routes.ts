@@ -730,18 +730,24 @@ Rules:
       let child;
       let parentLinked = false;
 
-      if (existingParent) {
-        // Look for an existing child with matching name under this parent
+      // Check for existing child with same name + parent email (regardless of parent account)
+      const childrenByEmail = await storage.getChildrenByParentEmail(parentEmail);
+      const existingChild = childrenByEmail.find(
+        (c) => c.name.toLowerCase().trim() === name.toLowerCase().trim()
+      );
+
+      if (existingChild) {
+        child = existingChild;
+        parentLinked = !!existingParent;
+      } else if (existingParent) {
+        // Also check children linked by parentId (in case parentEmail wasn't set)
         const parentChildren = await storage.getChildrenByParent(existingParent.id);
-        const existingChild = parentChildren.find(
+        const childByParent = parentChildren.find(
           (c) => c.name.toLowerCase().trim() === name.toLowerCase().trim()
         );
-
-        if (existingChild) {
-          // Link teacher to the existing child
-          child = existingChild;
+        if (childByParent) {
+          child = childByParent;
         } else {
-          // Parent exists but no matching child — create under parent
           child = await storage.createChild({
             name, parentId: existingParent.id, parentEmail,
             nickname: null, birthday: birthday || null,
@@ -750,7 +756,6 @@ Rules:
         }
         parentLinked = true;
       } else {
-        // No parent account yet — create unclaimed child until parent signs up
         child = await storage.createChild({
           name, parentId: "unclaimed", parentEmail,
           nickname: null, birthday: birthday || null,
@@ -913,20 +918,30 @@ Rules:
           let child;
           let parentLinked = false;
 
-          if (existingParent) {
+          // Check for existing child with same name + parent email
+          const childrenByEmail = await storage.getChildrenByParentEmail(primaryEmail);
+          const existingChild = childrenByEmail.find(
+            (c) => c.name.toLowerCase().trim() === name.toLowerCase().trim()
+          );
+
+          if (existingChild) {
+            child = existingChild;
+            parentLinked = !!existingParent;
+            if (existingParent) results.linked++;
+          } else if (existingParent) {
             const parentChildren = await getCachedChildren(existingParent.id);
-            const existingChild = parentChildren.find(
+            const childByParent = parentChildren.find(
               (c) => c.name.toLowerCase().trim() === name.toLowerCase().trim()
             );
-            if (existingChild) {
-              child = existingChild;
+            if (childByParent) {
+              child = childByParent;
             } else {
               child = await storage.createChild({
                 name, parentId: existingParent.id, parentEmail: primaryEmail,
                 nickname: null, birthday: birthday || null,
                 viewMode: "device", age: (age !== null && !isNaN(age)) ? age : null, profilePhoto: null,
               });
-              childrenCache.delete(existingParent.id); // invalidate so next sibling sees this child
+              childrenCache.delete(existingParent.id);
             }
             parentLinked = true;
             results.linked++;
