@@ -120,10 +120,6 @@ export default function TeacherDashboard() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/children"] });
       setBulkResults(data);
-      toast({
-        title: "Bulk upload complete",
-        description: `${data.created} students added, ${data.linked} linked to parents, ${data.skipped} skipped.`,
-      });
     },
     onError: (error: any) => {
       toast({ title: "Upload failed", description: error.message, variant: "destructive" });

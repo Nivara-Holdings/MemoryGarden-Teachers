@@ -66,7 +66,8 @@ export async function setupAuth(app: Express) {
   // Email/Password Registration
   app.post("/api/auth/register", async (req: any, res) => {
     try {
-      const { email, password, firstName, lastName, role, schoolName } = req.body;
+      const { email: rawEmail, password, firstName, lastName, role, schoolName } = req.body;
+      const email = rawEmail?.trim().toLowerCase();
       if (!email || !password) {
         return res.status(400).json({ message: "Email and password are required" });
       }
@@ -104,7 +105,8 @@ export async function setupAuth(app: Express) {
   // Email/Password Login
   app.post("/api/auth/login", async (req: any, res) => {
     try {
-      const { email, password } = req.body;
+      const { email: rawEmail, password } = req.body;
+      const email = rawEmail?.trim().toLowerCase();
       if (!email || !password) {
         return res.status(400).json({ message: "Email and password are required" });
       }
@@ -133,7 +135,8 @@ export async function setupAuth(app: Express) {
       const payload = JSON.parse(
         Buffer.from(credential.split(".")[1], "base64").toString()
       );
-      const { sub: googleId, email, given_name, family_name, picture } = payload;
+      const { sub: googleId, email: rawGoogleEmail, given_name, family_name, picture } = payload;
+      const email = rawGoogleEmail?.trim().toLowerCase();
       let user = await authStorage.getUserByGoogleId(googleId);
       if (!user) {
         user = await authStorage.getUserByEmail(email);
@@ -241,9 +244,7 @@ export async function setupAuth(app: Express) {
       if (!user) return res.status(404).json({ message: "User not found" });
 
       if (user.role === "teacher") {
-        // Unlink from all students (don't delete the children)
         await storage.deleteAllTeacherLinks(userId);
-        // Delete teacher-created memories
         await storage.deleteMemoriesByParent(userId);
       } else {
         // Parent: delete their children and all associated data
@@ -254,17 +255,16 @@ export async function setupAuth(app: Express) {
           await storage.deleteCoParentsByChild(child.id);
           await storage.deleteChild(child.id);
         }
-        // Delete memories they created as a co-parent
         await storage.deleteMemoriesByParent(userId);
-        // Remove co-parent links
         await storage.deleteCoParentsByParent(userId);
       }
 
-      // Delete user record
+      // Delete user record first, then destroy session
       await authStorage.deleteUser(userId);
+      console.log(`[Account] Deleted user ${userId} (${user.email})`);
 
-      // Destroy session
-      req.session.destroy(() => {
+      req.session.destroy((err: any) => {
+        if (err) console.error("[Account] Session destroy error:", err);
         res.json({ message: "Account deleted" });
       });
     } catch (error) {

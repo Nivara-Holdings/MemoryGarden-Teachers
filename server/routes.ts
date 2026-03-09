@@ -51,63 +51,6 @@ export async function registerRoutes(
     return !!link;
   }
 
-  // ---- ADMIN: Cleanup duplicate children (remove after use) ----
-  app.get("/api/admin/children", isAuthenticated, async (req: any, res) => {
-    try {
-      const { db } = await import("./db");
-      const { children, memories, teacherChildren } = await import("@shared/schema");
-      const { sql } = await import("drizzle-orm");
-      const all = await db.select().from(children);
-      const memCounts = await db.select({ 
-        childId: memories.childId, 
-        count: sql<number>`count(*)::int` 
-      }).from(memories).groupBy(memories.childId);
-      const links = await db.select().from(teacherChildren);
-      res.json({ children: all, memoryCounts: memCounts, teacherLinks: links });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  app.delete("/api/admin/children/:id", isAuthenticated, async (req: any, res) => {
-    try {
-      const { id } = req.params;
-      const { db } = await import("./db");
-      const { children, memories, teacherChildren } = await import("@shared/schema");
-      const { eq } = await import("drizzle-orm");
-      await db.delete(teacherChildren).where(eq(teacherChildren.childId, id));
-      await db.delete(memories).where(eq(memories.childId, id));
-      await db.delete(children).where(eq(children.id, id));
-      res.json({ deleted: id });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-
-  // Fix teacher memories: set actual teacher names on from field
-  app.patch("/api/admin/fix-teacher-memories", isAuthenticated, async (req: any, res) => {
-    try {
-      const { db } = await import("./db");
-      const { memories, teacherChildren } = await import("@shared/schema");
-      const { eq, and } = await import("drizzle-orm");
-      // Get all teacher links
-      const links = await db.select().from(teacherChildren);
-      const teacherIds = Array.from(new Set(links.map(l => l.teacherId)));
-      if (teacherIds.length === 0) return res.json({ updated: 0 });
-      // Update each teacher's memories with their actual name
-      let updated = 0;
-      for (const tid of teacherIds) {
-        const teacher = await authStorage.getUser(tid);
-        let name = teacher?.firstName
-          ? `${teacher.firstName}${teacher.lastName ? ' ' + teacher.lastName : ''}`
-          : "Teacher";
-        if (teacher?.schoolName) name += `, ${teacher.schoolName}`;
-        await db.update(memories)
-          .set({ from: name, source: "teacher" })
-          .where(eq(memories.parentId, tid));
-        updated++;
-      }
-      res.json({ updated, teacherIds });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
-  });
-  // ---- END ADMIN ----
-
   // Upload request URL (replaces Replit Object Storage)
   app.post("/api/uploads/request-url", isAuthenticated, (req: any, res) => {
     try {
@@ -775,7 +718,8 @@ Rules:
   app.post("/api/teacher/children", isAuthenticated, async (req: any, res) => {
     try {
       const teacherId = req.user?.claims?.sub;
-      const { name, parentEmail, birthday, age } = req.body;
+      const { name, parentEmail: rawEmail, birthday, age } = req.body;
+      const parentEmail = rawEmail?.trim().toLowerCase();
       if (!name || !parentEmail) {
         return res.status(400).json({ error: "Child name and parent email are required" });
       }
@@ -786,18 +730,24 @@ Rules:
       let child;
       let parentLinked = false;
 
-      if (existingParent) {
-        // Look for an existing child with matching name under this parent
+      // Check for existing child with same name + parent email (regardless of parent account)
+      const childrenByEmail = await storage.getChildrenByParentEmail(parentEmail);
+      const existingChild = childrenByEmail.find(
+        (c) => c.name.toLowerCase().trim() === name.toLowerCase().trim()
+      );
+
+      if (existingChild) {
+        child = existingChild;
+        parentLinked = !!existingParent;
+      } else if (existingParent) {
+        // Also check children linked by parentId (in case parentEmail wasn't set)
         const parentChildren = await storage.getChildrenByParent(existingParent.id);
-        const existingChild = parentChildren.find(
+        const childByParent = parentChildren.find(
           (c) => c.name.toLowerCase().trim() === name.toLowerCase().trim()
         );
-
-        if (existingChild) {
-          // Link teacher to the existing child
-          child = existingChild;
+        if (childByParent) {
+          child = childByParent;
         } else {
-          // Parent exists but no matching child — create under parent
           child = await storage.createChild({
             name, parentId: existingParent.id, parentEmail,
             nickname: null, birthday: birthday || null,
@@ -806,9 +756,8 @@ Rules:
         }
         parentLinked = true;
       } else {
-        // No parent account yet — create child under teacher temporarily
         child = await storage.createChild({
-          name, parentId: teacherId, parentEmail,
+          name, parentId: "unclaimed", parentEmail,
           nickname: null, birthday: birthday || null,
           viewMode: "device", age: age || null, profilePhoto: null,
         });
@@ -879,7 +828,13 @@ Rules:
       const lastNameIdx = headerRaw.findIndex((h: string) => h === "last name" || h === "last_name" || h === "lastname");
       // Also support a single "name" column as fallback
       const nameIdx = headerRaw.findIndex((h: string) => h === "name" || h === "child name" || h === "student name" || h === "student");
-      const emailIdx = headerRaw.findIndex((h: string) => h === "parent email" || h === "parent emails" || h === "email" || h === "emails" || h === "parent_email" || h === "parent_emails");
+      const emailMatchers = ["parent email", "parent emails", "email", "emails", "parent_email", "parent_emails", "parent 1 email", "parent 2 email", "co-parent email", "co parent email"];
+      const emailIdx = headerRaw.findIndex((h: string) => emailMatchers.includes(h));
+      // Collect ALL email column indices (for sheets with separate parent1/parent2 columns)
+      const allEmailIdxs = headerRaw.reduce((acc: number[], h: string, idx: number) => {
+        if (emailMatchers.includes(h)) acc.push(idx);
+        return acc;
+      }, []);
       const birthdayIdx = headerRaw.findIndex((h: string) => h === "birthday" || h === "dob" || h === "date of birth");
       const ageIdx = headerRaw.findIndex((h: string) => h === "age");
 
@@ -895,8 +850,26 @@ Rules:
       // Get teacher name once for emails
       const teacher = await authStorage.getUser(teacherId);
       const teacherName = teacher?.firstName ? `${teacher.firstName}${teacher.lastName ? ' ' + teacher.lastName : ''}` : "A teacher";
-      // Track emails already sent this batch to avoid duplicates per parent
+      // Track unique child+parent combos to skip duplicate CSV rows
+      const seenChildren = new Set<string>();
+      // Track emails already sent this batch to avoid duplicates per parent+child
       const emailsSent = new Set<string>();
+      // Cache parent lookups by email to avoid redundant DB calls across rows
+      const parentCache = new Map<string, Awaited<ReturnType<typeof authStorage.getUserByEmail>>>();
+      const childrenCache = new Map<string, Awaited<ReturnType<typeof storage.getChildrenByParent>>>();
+
+      async function getCachedUser(email: string) {
+        if (!parentCache.has(email)) {
+          parentCache.set(email, await authStorage.getUserByEmail(email));
+        }
+        return parentCache.get(email)!;
+      }
+      async function getCachedChildren(parentId: string) {
+        if (!childrenCache.has(parentId)) {
+          childrenCache.set(parentId, await storage.getChildrenByParent(parentId));
+        }
+        return childrenCache.get(parentId)!;
+      }
 
       for (let i = 1; i < lines.length; i++) {
         const cols = parseCSVLine(lines[i]);
@@ -910,12 +883,20 @@ Rules:
           name = cols[nameIdx]?.trim() || "";
         }
 
-        // Support multiple parent emails (comma or semicolon separated within the field)
-        const rawEmails = cols[emailIdx]?.trim() || "";
-        const parentEmails = rawEmails
-          .split(/[;,]/)
-          .map((e: string) => e.trim().toLowerCase())
-          .filter((e: string) => e.length > 0);
+        // Collect emails from all email columns (handles separate parent1/parent2 columns)
+        // Also supports comma/semicolon-separated emails within a single quoted field
+        const parentEmails: string[] = [];
+        for (const eIdx of allEmailIdxs) {
+          const raw = cols[eIdx]?.trim() || "";
+          for (const part of raw.split(/[;,]/)) {
+            const email = part.trim().toLowerCase();
+            if (email.length > 0 && !parentEmails.includes(email)) {
+              parentEmails.push(email);
+            }
+          }
+        }
+
+        console.log(`[Bulk] Row ${i + 1}: name="${name}", emails=[${parentEmails.join(", ")}], cols=[${cols.join(" | ")}]`);
 
         if (!name || parentEmails.length === 0) {
           results.errors.push(`Row ${i + 1}: missing name or parent email`);
@@ -930,38 +911,57 @@ Rules:
           continue;
         }
 
+        // Skip duplicate child+parent email rows
+        const primaryEmail = parentEmails[0];
+        const childKey = `${name.toLowerCase().trim()}:${primaryEmail}`;
+        if (seenChildren.has(childKey)) {
+          results.skipped++;
+          continue;
+        }
+        seenChildren.add(childKey);
+
         const birthday = birthdayIdx !== -1 ? (cols[birthdayIdx]?.trim() || null) : null;
         const ageStr = ageIdx !== -1 ? cols[ageIdx]?.trim() : null;
         const age = ageStr ? parseInt(ageStr) : null;
 
         // First email is the primary parent, rest are co-parents
-        const primaryEmail = parentEmails[0];
         const coParentEmails = parentEmails.slice(1);
 
         try {
-          const existingParent = await authStorage.getUserByEmail(primaryEmail);
+          const existingParent = await getCachedUser(primaryEmail);
           let child;
           let parentLinked = false;
 
-          if (existingParent) {
-            const parentChildren = await storage.getChildrenByParent(existingParent.id);
-            const existingChild = parentChildren.find(
+          // Check for existing child with same name + parent email
+          const childrenByEmail = await storage.getChildrenByParentEmail(primaryEmail);
+          const existingChild = childrenByEmail.find(
+            (c) => c.name.toLowerCase().trim() === name.toLowerCase().trim()
+          );
+
+          if (existingChild) {
+            child = existingChild;
+            parentLinked = !!existingParent;
+            if (existingParent) results.linked++;
+          } else if (existingParent) {
+            const parentChildren = await getCachedChildren(existingParent.id);
+            const childByParent = parentChildren.find(
               (c) => c.name.toLowerCase().trim() === name.toLowerCase().trim()
             );
-            if (existingChild) {
-              child = existingChild;
+            if (childByParent) {
+              child = childByParent;
             } else {
               child = await storage.createChild({
                 name, parentId: existingParent.id, parentEmail: primaryEmail,
                 nickname: null, birthday: birthday || null,
                 viewMode: "device", age: (age !== null && !isNaN(age)) ? age : null, profilePhoto: null,
               });
+              childrenCache.delete(existingParent.id);
             }
             parentLinked = true;
             results.linked++;
           } else {
             child = await storage.createChild({
-              name, parentId: teacherId, parentEmail: primaryEmail,
+              name, parentId: "unclaimed", parentEmail: primaryEmail,
               nickname: null, birthday: birthday || null,
               viewMode: "device", age: (age !== null && !isNaN(age)) ? age : null, profilePhoto: null,
             });
@@ -974,31 +974,38 @@ Rules:
 
           // Add co-parents for this child
           for (const coEmail of coParentEmails) {
+            const coParentUser = await getCachedUser(coEmail);
             const existingCoParent = await storage.getCoParentByEmail(coEmail, child.id);
             if (!existingCoParent) {
-              const coParentUser = await authStorage.getUserByEmail(coEmail);
               await storage.inviteCoParent(coEmail, child.id, teacherId, coParentUser?.id);
             }
-            // Send co-parent email
-            if (!emailsSent.has(coEmail)) {
-              emailsSent.add(coEmail);
-              const coParentUser = await authStorage.getUserByEmail(coEmail);
+            // Send co-parent email (dedup by email+child so siblings each trigger an email)
+            const coKey = `${coEmail}:${child.id}`;
+            if (!emailsSent.has(coKey)) {
+              emailsSent.add(coKey);
+              console.log(`[Bulk] Sending email to co-parent: ${coEmail} for child: ${name}`);
               if (coParentUser) {
                 sendChildLinkedEmail(coEmail, name, teacherName);
               } else {
                 sendParentInviteEmail(coEmail, name, teacherName);
               }
+            } else {
+              console.log(`[Bulk] Skipped co-parent email (already sent): ${coKey}`);
             }
           }
 
-          // Send primary parent email
-          if (!emailsSent.has(primaryEmail)) {
-            emailsSent.add(primaryEmail);
+          // Send primary parent email (dedup by email+child so siblings each trigger an email)
+          const primaryKey = `${primaryEmail}:${child.id}`;
+          if (!emailsSent.has(primaryKey)) {
+            emailsSent.add(primaryKey);
+            console.log(`[Bulk] Sending email to primary parent: ${primaryEmail} for child: ${name}`);
             if (parentLinked) {
               sendChildLinkedEmail(primaryEmail, name, teacherName);
             } else {
               sendParentInviteEmail(primaryEmail, name, teacherName);
             }
+          } else {
+            console.log(`[Bulk] Skipped email (already sent): ${primaryKey}`);
           }
 
           results.created++;
@@ -1026,15 +1033,6 @@ Rules:
       if (!link) return res.status(404).json({ error: "Child not linked to you" });
 
       await storage.unlinkTeacherFromChild(teacherId, childId);
-
-      // If teacher was the temporary parent (no real parent signed up yet),
-      // also delete the child and their memories since nobody else owns them
-      const child = await storage.getChild(childId);
-      if (child && child.parentId === teacherId) {
-        await storage.deleteMemoriesByChild(childId);
-        await storage.deleteCoParentsByChild(childId);
-        await storage.deleteChild(childId);
-      }
 
       res.status(204).send();
     } catch (error) {
