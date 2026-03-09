@@ -828,7 +828,13 @@ Rules:
       const lastNameIdx = headerRaw.findIndex((h: string) => h === "last name" || h === "last_name" || h === "lastname");
       // Also support a single "name" column as fallback
       const nameIdx = headerRaw.findIndex((h: string) => h === "name" || h === "child name" || h === "student name" || h === "student");
-      const emailIdx = headerRaw.findIndex((h: string) => h === "parent email" || h === "parent emails" || h === "email" || h === "emails" || h === "parent_email" || h === "parent_emails");
+      const emailMatchers = ["parent email", "parent emails", "email", "emails", "parent_email", "parent_emails", "parent 1 email", "parent 2 email", "co-parent email", "co parent email"];
+      const emailIdx = headerRaw.findIndex((h: string) => emailMatchers.includes(h));
+      // Collect ALL email column indices (for sheets with separate parent1/parent2 columns)
+      const allEmailIdxs = headerRaw.reduce((acc: number[], h: string, idx: number) => {
+        if (emailMatchers.includes(h)) acc.push(idx);
+        return acc;
+      }, []);
       const birthdayIdx = headerRaw.findIndex((h: string) => h === "birthday" || h === "dob" || h === "date of birth");
       const ageIdx = headerRaw.findIndex((h: string) => h === "age");
 
@@ -877,12 +883,20 @@ Rules:
           name = cols[nameIdx]?.trim() || "";
         }
 
-        // Support multiple parent emails (comma or semicolon separated within the field)
-        const rawEmails = cols[emailIdx]?.trim() || "";
-        const parentEmails = rawEmails
-          .split(/[;,]/)
-          .map((e: string) => e.trim().toLowerCase())
-          .filter((e: string) => e.length > 0);
+        // Collect emails from all email columns (handles separate parent1/parent2 columns)
+        // Also supports comma/semicolon-separated emails within a single quoted field
+        const parentEmails: string[] = [];
+        for (const eIdx of allEmailIdxs) {
+          const raw = cols[eIdx]?.trim() || "";
+          for (const part of raw.split(/[;,]/)) {
+            const email = part.trim().toLowerCase();
+            if (email.length > 0 && !parentEmails.includes(email)) {
+              parentEmails.push(email);
+            }
+          }
+        }
+
+        console.log(`[Bulk] Row ${i + 1}: name="${name}", emails=[${parentEmails.join(", ")}], cols=[${cols.join(" | ")}]`);
 
         if (!name || parentEmails.length === 0) {
           results.errors.push(`Row ${i + 1}: missing name or parent email`);
@@ -969,11 +983,14 @@ Rules:
             const coKey = `${coEmail}:${child.id}`;
             if (!emailsSent.has(coKey)) {
               emailsSent.add(coKey);
+              console.log(`[Bulk] Sending email to co-parent: ${coEmail} for child: ${name}`);
               if (coParentUser) {
                 sendChildLinkedEmail(coEmail, name, teacherName);
               } else {
                 sendParentInviteEmail(coEmail, name, teacherName);
               }
+            } else {
+              console.log(`[Bulk] Skipped co-parent email (already sent): ${coKey}`);
             }
           }
 
@@ -981,11 +998,14 @@ Rules:
           const primaryKey = `${primaryEmail}:${child.id}`;
           if (!emailsSent.has(primaryKey)) {
             emailsSent.add(primaryKey);
+            console.log(`[Bulk] Sending email to primary parent: ${primaryEmail} for child: ${name}`);
             if (parentLinked) {
               sendChildLinkedEmail(primaryEmail, name, teacherName);
             } else {
               sendParentInviteEmail(primaryEmail, name, teacherName);
             }
+          } else {
+            console.log(`[Bulk] Skipped email (already sent): ${primaryKey}`);
           }
 
           results.created++;

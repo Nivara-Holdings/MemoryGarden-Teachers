@@ -4,18 +4,37 @@ const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KE
 const fromEmail = "Memory Garden <no-reply@memory-garden.ai>";
 const appUrl = process.env.APP_URL || "https://www.memory-garden.ai";
 
-async function sendEmail(to: string, subject: string, html: string) {
+// Simple email queue to respect Resend's 2 req/sec rate limit
+const emailQueue: Array<{ to: string; subject: string; html: string }> = [];
+let processing = false;
+
+async function processQueue() {
+  if (processing) return;
+  processing = true;
+  while (emailQueue.length > 0) {
+    const { to, subject, html } = emailQueue.shift()!;
+    try {
+      console.log(`[Email] Sending to "${to}": ${subject}`);
+      const result = await resend!.emails.send({ from: fromEmail, to, subject, html });
+      console.log(`[Email] Sent to ${to}:`, result?.data?.id || result);
+    } catch (error: any) {
+      console.error(`[Email] Failed to send to ${to}:`, error?.message || error);
+    }
+    // Wait 600ms between sends (stays under 2/sec limit)
+    if (emailQueue.length > 0) {
+      await new Promise(r => setTimeout(r, 600));
+    }
+  }
+  processing = false;
+}
+
+function queueEmail(to: string, subject: string, html: string) {
   if (!resend) {
     console.log(`[Email] No RESEND_API_KEY — skipping email to ${to}: ${subject}`);
     return;
   }
-  try {
-    console.log(`[Email] Sending from "${fromEmail}" to "${to}": ${subject}`);
-    const result = await resend.emails.send({ from: fromEmail, to, subject, html });
-    console.log(`[Email] Sent to ${to}: ${subject}`, result);
-  } catch (error) {
-    console.error(`[Email] Failed to send to ${to}:`, error);
-  }
+  emailQueue.push({ to, subject, html });
+  processQueue();
 }
 
 // When a teacher adds a child and the parent isn't on the app yet
@@ -31,7 +50,7 @@ export function sendParentInviteEmail(parentEmail: string, childName: string, te
       <p style="color: #666; font-size: 14px;">Use this email (${parentEmail}) when you sign up so your account links automatically.</p>
     </div>
   `;
-  sendEmail(parentEmail, subject, html);
+  queueEmail(parentEmail, subject, html);
 }
 
 // When a teacher adds a child and the parent already has an account
@@ -46,7 +65,7 @@ export function sendChildLinkedEmail(parentEmail: string, childName: string, tea
       <p><a href="${appUrl}" style="display: inline-block; background: #2d5016; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none;">Open ${childName}'s Garden</a></p>
     </div>
   `;
-  sendEmail(parentEmail, subject, html);
+  queueEmail(parentEmail, subject, html);
 }
 
 // When a parent invites the other parent (co-parent) to join
@@ -62,5 +81,5 @@ export function sendCoParentInviteEmail(coParentEmail: string, childName: string
       <p style="color: #666; font-size: 14px;">Sign up with this email (${coParentEmail}) and you'll be connected to ${childName}'s garden automatically.</p>
     </div>
   `;
-  sendEmail(coParentEmail, subject, html);
+  queueEmail(coParentEmail, subject, html);
 }
