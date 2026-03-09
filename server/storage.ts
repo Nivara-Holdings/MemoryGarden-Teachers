@@ -6,7 +6,7 @@ import {
   memories, children, teacherChildren, coParents
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, isNull } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -210,7 +210,7 @@ export class DatabaseStorage implements IStorage {
     return db
       .select()
       .from(coParents)
-      .where(and(eq(coParents.email, email), eq(coParents.parentId, null as any)));
+      .where(and(eq(coParents.email, email), isNull(coParents.parentId)));
   }
 
   async inviteCoParent(email: string, childId: string, invitedBy: string, parentId?: string): Promise<CoParent> {
@@ -226,7 +226,7 @@ export class DatabaseStorage implements IStorage {
     await db
       .update(coParents)
       .set({ parentId })
-      .where(and(eq(coParents.email, email), eq(coParents.parentId, null as any)));
+      .where(and(eq(coParents.email, email), isNull(coParents.parentId)));
   }
 
   // ---- Cascade Delete Operations ----
