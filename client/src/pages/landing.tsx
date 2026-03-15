@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Sprout, ArrowLeft, Loader2, Heart, GraduationCap, Play } from "lucide-react";
+import { Sprout, ArrowLeft, Loader2, Heart, GraduationCap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -131,52 +131,16 @@ export default function Landing() {
             <p className="text-base text-primary/80 italic font-serif mb-3">
               So they never have to wonder.
             </p>
-            <p className="text-sm text-muted-foreground max-w-[300px] mx-auto leading-relaxed">
-              Every child deserves to know they were seen — for their kindness, their bravery, their humor, their heart. Memory Garden is where that story grows.
+            <p className="text-sm text-muted-foreground max-w-[280px] mx-auto leading-relaxed">
+              Where everyone who loves them adds to the story of who they are.
             </p>
           </div>
 
-          {/* Demo video placeholder */}
-          <div className="mb-8 max-w-[320px] mx-auto">
-            <div className="relative aspect-video rounded-2xl bg-muted/50 border border-border overflow-hidden flex items-center justify-center cursor-pointer hover:bg-muted/70 transition-colors">
-              <div className="text-center">
-                <div className="w-12 h-12 rounded-full bg-primary/10 mx-auto mb-2 flex items-center justify-center">
-                  <Play className="w-5 h-5 text-primary ml-0.5" />
-                </div>
-                <p className="text-xs text-muted-foreground">See how it works</p>
-              </div>
-            </div>
-          </div>
-
-          {/* How it works */}
-          <div className="mb-10 max-w-[320px] mx-auto">
-            <div className="flex items-start gap-4 mb-4">
-              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                <span className="text-xs font-semibold text-primary">1</span>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">Everyone adds to the story</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Mom, Dad, teacher, coach, grandma — everyone who sees something worth remembering</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-4 mb-4">
-              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                <span className="text-xs font-semibold text-primary">2</span>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">Just speak or snap — AI does the rest</p>
-                <p className="text-xs text-muted-foreground mt-0.5">A quick voice note becomes a beautiful memory they'll treasure</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-4">
-              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                <span className="text-xs font-semibold text-primary">3</span>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">They grow up knowing who they are</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Kind. Brave. Funny. Resilient. Seen — by everyone.</p>
-              </div>
-            </div>
+          {/* Three words */}
+          <div className="mb-10 flex justify-center gap-6 text-sm text-muted-foreground">
+            <span>Seen.</span>
+            <span>Celebrated.</span>
+            <span>Remembered.</span>
           </div>
         </div>
 
