@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Sprout, ArrowLeft, Loader2, Heart, GraduationCap } from "lucide-react";
+import { Sprout, ArrowLeft, Loader2, Heart, GraduationCap, Play } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -121,31 +121,61 @@ export default function Landing() {
 
         <div className="flex-1 flex flex-col justify-center px-8 relative z-10">
           {/* Logo */}
-          <div className="text-center mb-10">
-            <div className="w-20 h-20 rounded-full bg-[hsl(var(--sage-light))] mx-auto mb-8 flex items-center justify-center">
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 rounded-full bg-[hsl(var(--sage-light))] mx-auto mb-6 flex items-center justify-center">
               <Sprout className="w-10 h-10 text-primary" />
             </div>
             <h1 className="text-4xl font-serif tracking-tight text-foreground mb-3">
               Memory Garden
             </h1>
-            <p className="text-base text-primary/80 italic font-serif">
+            <p className="text-base text-primary/80 italic font-serif mb-3">
               So they never have to wonder.
+            </p>
+            <p className="text-sm text-muted-foreground max-w-[300px] mx-auto leading-relaxed">
+              Every child deserves to know they were seen — for their kindness, their bravery, their humor, their heart. Memory Garden is where that story grows.
             </p>
           </div>
 
-          {/* Value props */}
-          <div className="space-y-4 mb-12 max-w-[300px] mx-auto">
-            <div className="flex items-start gap-3">
-              <span className="text-lg mt-0.5">💛</span>
-              <p className="text-sm text-muted-foreground">Capture everyday moments before they slip away</p>
+          {/* Demo video placeholder */}
+          <div className="mb-8 max-w-[320px] mx-auto">
+            <div className="relative aspect-video rounded-2xl bg-muted/50 border border-border overflow-hidden flex items-center justify-center cursor-pointer hover:bg-muted/70 transition-colors">
+              <div className="text-center">
+                <div className="w-12 h-12 rounded-full bg-primary/10 mx-auto mb-2 flex items-center justify-center">
+                  <Play className="w-5 h-5 text-primary ml-0.5" />
+                </div>
+                <p className="text-xs text-muted-foreground">See how it works</p>
+              </div>
             </div>
-            <div className="flex items-start gap-3">
-              <span className="text-lg mt-0.5">🌱</span>
-              <p className="text-sm text-muted-foreground">Parents, teachers, coaches — everyone contributes</p>
+          </div>
+
+          {/* How it works */}
+          <div className="mb-10 max-w-[320px] mx-auto">
+            <div className="flex items-start gap-4 mb-4">
+              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                <span className="text-xs font-semibold text-primary">1</span>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">Everyone adds to the story</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Mom, Dad, teacher, coach, grandma — everyone who sees something worth remembering</p>
+              </div>
             </div>
-            <div className="flex items-start gap-3">
-              <span className="text-lg mt-0.5">⭐</span>
-              <p className="text-sm text-muted-foreground">Give them a gift they'll treasure forever</p>
+            <div className="flex items-start gap-4 mb-4">
+              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                <span className="text-xs font-semibold text-primary">2</span>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">Just speak or snap — AI does the rest</p>
+                <p className="text-xs text-muted-foreground mt-0.5">A quick voice note becomes a beautiful memory they'll treasure</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-4">
+              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                <span className="text-xs font-semibold text-primary">3</span>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">They grow up knowing who they are</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Kind. Brave. Funny. Resilient. Seen — by everyone.</p>
+              </div>
             </div>
           </div>
         </div>
@@ -202,7 +232,7 @@ export default function Landing() {
                 </div>
                 <div>
                   <p className="text-base font-medium text-foreground group-hover:text-primary transition-colors">For Parents</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">Capture and preserve your child's everyday moments</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">Start your child's story — the laughter, the kindness, the little things</p>
                 </div>
               </div>
             </button>
@@ -218,7 +248,7 @@ export default function Landing() {
                 </div>
                 <div>
                   <p className="text-base font-medium text-foreground group-hover:text-primary transition-colors">For Organizations</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">Share the moments parents would otherwise miss</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">Add to the story — the bravery, the kindness, the moments that build who they become</p>
                 </div>
               </div>
             </button>
