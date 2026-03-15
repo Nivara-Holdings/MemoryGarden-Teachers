@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
 type Screen = "home" | "login" | "signup" | "forgot-password";
-type Role = "mom" | "dad" | "teacher";
+type Role = "parent" | "organization";
 
 export default function Landing() {
   const [screen, setScreen] = useState<Screen>("home");
@@ -64,7 +64,7 @@ export default function Landing() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email, password, firstName, lastName, role, schoolName: role === "teacher" ? schoolName : undefined }),
+        body: JSON.stringify({ email, password, firstName, lastName, role, schoolName: role === "organization" ? schoolName : undefined }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -140,7 +140,7 @@ export default function Landing() {
             </div>
             <div className="flex items-start gap-3">
               <span className="text-lg mt-0.5">🌱</span>
-              <p className="text-sm text-muted-foreground">Watch their story grow, month by month</p>
+              <p className="text-sm text-muted-foreground">Parents, teachers, coaches — everyone contributes</p>
             </div>
             <div className="flex items-start gap-3">
               <span className="text-lg mt-0.5">⭐</span>
@@ -238,11 +238,10 @@ export default function Landing() {
             {/* Role Picker */}
             <div className="space-y-2">
               <Label className="text-muted-foreground text-sm">I am a...</Label>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 {([
-                  { value: "mom" as Role, label: "Mom" },
-                  { value: "dad" as Role, label: "Dad" },
-                  { value: "teacher" as Role, label: "Teacher" },
+                  { value: "parent" as Role, label: "Parent" },
+                  { value: "organization" as Role, label: "Organization" },
                 ]).map((option) => (
                   <button
                     key={option.value}
@@ -271,7 +270,7 @@ export default function Landing() {
                 <Input type="text" placeholder="Last" value={lastName} onChange={(e) => setLastName(e.target.value)} className="py-5 px-4 text-base rounded-xl" />
               </div>
             </div>
-            {role === "teacher" && (
+            {role === "organization" && (
               <div className="space-y-2">
                 <Label className="text-muted-foreground text-sm">School / Organization</Label>
                 <Input type="text" placeholder="e.g. Camp Sunshine, Lincoln Elementary" value={schoolName} onChange={(e) => setSchoolName(e.target.value)} className="py-5 px-4 text-base rounded-xl" />

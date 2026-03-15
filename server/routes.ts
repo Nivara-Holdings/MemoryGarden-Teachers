@@ -130,7 +130,7 @@ export async function registerRoutes(
 
       // If user is a teacher, set proper "from" name and source
       const currentUser = await authStorage.getUser(parentId);
-      if (currentUser?.role === "teacher") {
+      if (currentUser?.role === "teacher" || currentUser?.role === "organization") {
         let teacherName = currentUser.firstName
           ? `${currentUser.firstName}${currentUser.lastName ? ' ' + currentUser.lastName : ''}`
           : "Teacher";
@@ -442,7 +442,7 @@ export async function registerRoutes(
       // Detect if user is a teacher
       const userId = req.user?.claims?.sub;
       const currentUser = await authStorage.getUser(userId);
-      const isTeacher = currentUser?.role === "teacher";
+      const isTeacher = currentUser?.role === "teacher" || currentUser?.role === "organization";
 
       const childRef = childName ? ` named ${childName}` : '';
       const nicknameRef = childNickname ? ` (nickname: "${childNickname}")` : '';

@@ -1,8 +1,16 @@
 import { sql } from "drizzle-orm";
 import { index, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
 
-export const userRoles = ["mom", "dad", "teacher"] as const;
+export const userRoles = ["mom", "dad", "teacher", "parent", "organization"] as const;
 export type UserRole = typeof userRoles[number];
+
+export function isParentRole(role: string | null | undefined): boolean {
+  return role === "mom" || role === "dad" || role === "parent";
+}
+
+export function isOrganizationRole(role: string | null | undefined): boolean {
+  return role === "teacher" || role === "organization";
+}
 
 export const sessions = pgTable(
   "sessions",

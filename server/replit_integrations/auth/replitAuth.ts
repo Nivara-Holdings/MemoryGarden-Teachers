@@ -71,8 +71,8 @@ export async function setupAuth(app: Express) {
       if (!email || !password) {
         return res.status(400).json({ message: "Email and password are required" });
       }
-      if (role && !["mom", "dad", "teacher"].includes(role)) {
-        return res.status(400).json({ message: "Role must be mom, dad, or teacher" });
+      if (role && !["mom", "dad", "teacher", "parent", "organization"].includes(role)) {
+        return res.status(400).json({ message: "Role must be parent or organization" });
       }
       const existingUser = await authStorage.getUserByEmail(email);
       if (existingUser) {
@@ -86,12 +86,12 @@ export async function setupAuth(app: Express) {
         lastName: lastName || null,
         profileImageUrl: null,
         role: role || null,
-        schoolName: role === "teacher" ? (schoolName || null) : null,
+        schoolName: (role === "teacher" || role === "organization") ? (schoolName || null) : null,
       });
       req.session.userId = user.id;
 
-      // Auto-link children if a teacher added them with this email
-      if (role === "mom" || role === "dad") {
+      // Auto-link children if an organization added them with this email
+      if (role === "mom" || role === "dad" || role === "parent") {
         await autoLinkChildrenByEmail(user.id, email);
       }
 
@@ -150,7 +150,7 @@ export async function setupAuth(app: Express) {
           });
 
           // Auto-link children for new parent accounts
-          if (role === "mom" || role === "dad") {
+          if (role === "mom" || role === "dad" || role === "parent") {
             await autoLinkChildrenByEmail(user.id, email);
           }
         }
@@ -168,8 +168,8 @@ export async function setupAuth(app: Express) {
     try {
       const userId = req.user.claims.sub;
       const { role } = req.body;
-      if (!role || !["mom", "dad", "teacher"].includes(role)) {
-        return res.status(400).json({ message: "Role must be mom, dad, or teacher" });
+      if (!role || !["mom", "dad", "teacher", "parent", "organization"].includes(role)) {
+        return res.status(400).json({ message: "Role must be parent or organization" });
       }
       const user = await authStorage.getUser(userId);
       if (!user) return res.status(404).json({ message: "User not found" });
@@ -177,7 +177,7 @@ export async function setupAuth(app: Express) {
       const updated = await authStorage.upsertUser({ ...user, role });
 
       // Auto-link if switching to a parent role
-      if ((role === "mom" || role === "dad") && user.email) {
+      if ((role === "mom" || role === "dad" || role === "parent") && user.email) {
         await autoLinkChildrenByEmail(userId, user.email);
       }
 
@@ -243,7 +243,7 @@ export async function setupAuth(app: Express) {
       const user = await authStorage.getUser(userId);
       if (!user) return res.status(404).json({ message: "User not found" });
 
-      if (user.role === "teacher") {
+      if (user.role === "teacher" || user.role === "organization") {
         await storage.deleteAllTeacherLinks(userId);
         await storage.deleteMemoriesByParent(userId);
       } else {

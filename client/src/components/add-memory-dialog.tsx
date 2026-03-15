@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Mic, Image, Loader2, Calendar, Square, Sparkles, ScanText } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { InsertMemory } from "@shared/schema";
+import { isOrganizationRole } from "@shared/models/auth";
 
 interface AddMemoryDialogProps {
   open: boolean;
@@ -31,8 +32,8 @@ const categories = [
 ];
 
 export default function AddMemoryDialog({ open, onOpenChange, onSubmit, childId, childName, childNickname, userRole }: AddMemoryDialogProps) {
-  const isTeacher = userRole === "teacher";
-  const defaultFrom = isTeacher ? "Teacher" : userRole === "dad" ? "Dad" : "Mom";
+  const isTeacher = isOrganizationRole(userRole);
+  const defaultFrom = isTeacher ? "Teacher" : "Parent";
 
   const [note, setNote] = useState("");
   const [refinedNote, setRefinedNote] = useState("");

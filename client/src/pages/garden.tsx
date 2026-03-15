@@ -30,6 +30,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Memory, InsertMemory, Child } from "@shared/schema";
+import { isOrganizationRole } from "@shared/models/auth";
 
 const filterOptions = [
   { key: "all", label: "All", emoji: "🌿" },
@@ -52,7 +53,7 @@ export default function Garden() {
   const [inviteEmail, setInviteEmail] = useState("");
   const { user, logout } = useAuth();
   const { toast } = useToast();
-  const isTeacher = user?.role === "teacher";
+  const isTeacher = isOrganizationRole(user?.role);
 
   const { data: children = [], isLoading: loadingChildren } = useQuery<Child[]>({
     queryKey: ["/api/children"],

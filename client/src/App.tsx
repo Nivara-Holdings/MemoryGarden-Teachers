@@ -12,6 +12,7 @@ import AddChild from "@/pages/add-child";
 import TeacherDashboard from "@/pages/teacher-dashboard";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
+import { isOrganizationRole } from "@shared/models/auth";
 
 function Router() {
   const { user, isLoading, isAuthenticated } = useAuth();
@@ -28,7 +29,7 @@ function Router() {
     return <Landing />;
   }
 
-  const isTeacher = user?.role === "teacher";
+  const isTeacher = isOrganizationRole(user?.role);
 
   return (
     <Switch>
