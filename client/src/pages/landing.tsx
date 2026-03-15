@@ -10,9 +10,14 @@ type Screen = "home" | "choose-path" | "login" | "signup" | "forgot-password";
 type Role = "parent" | "organization";
 
 const sampleMemories = [
-  { quote: "She shared her snack with the new kid today. Nobody asked her to.", from: "Ms. Rivera", role: "Teacher" },
-  { quote: "He fell off the monkey bars, got back up, and said 'I'm gonna try again.'", from: "Coach Dan", role: "Coach" },
-  { quote: "She made her little brother laugh so hard at dinner he couldn't breathe.", from: "Mom", role: "Mom" },
+  { quote: "There was a new girl at lunch with nowhere to sit. You moved your tray over without a word. That's who you are.", from: "Mom", role: "Mom" },
+  { quote: "Lost the race. Dead last. Walked up to the winner and said 'that was awesome.' This kid, man.", from: "Coach Dan", role: "Coach" },
+  { quote: "I overheard you tell your crying friend: 'you're not alone, I'm right here.' You're six years old and you already know how to love.", from: "Grandma", role: "Grandma" },
+  { quote: "Wrong answer. Whole class watching. Big breath. Hand goes right back up. That's not something you can teach.", from: "Mrs. Patel", role: "Teacher" },
+  { quote: "You were down to your last sticker — the shiny one you'd been saving all week. You gave it to a kid having a rough day.", from: "Dad", role: "Dad" },
+  { quote: "Someone was being mean to the quiet kid in the back. She stepped in. Nobody asked her to, nobody expected her to.", from: "Ms. Rivera", role: "Teacher" },
+  { quote: "The whole room was tense before the test. He cracked a joke — not for attention, just to help everyone breathe.", from: "Ms. Chen", role: "Teacher" },
+  { quote: "A man at the store stopped me to say you held the door and asked how his day was. He said 'you're raising her right.' I wanted to cry.", from: "Mom", role: "Mom" },
 ];
 
 export default function Landing() {
