@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +8,12 @@ import { useQueryClient } from "@tanstack/react-query";
 
 type Screen = "home" | "choose-path" | "login" | "signup" | "forgot-password";
 type Role = "parent" | "organization";
+
+const sampleMemories = [
+  { quote: "She shared her snack with the new kid today. Nobody asked her to.", from: "Ms. Rivera", role: "Teacher" },
+  { quote: "He fell off the monkey bars, got back up, and said 'I'm gonna try again.'", from: "Coach Dan", role: "Coach" },
+  { quote: "She made her little brother laugh so hard at dinner he couldn't breathe.", from: "Mom", role: "Mom" },
+];
 
 export default function Landing() {
   const [screen, setScreen] = useState<Screen>("home");
@@ -22,8 +28,17 @@ export default function Landing() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [resetSuccess, setResetSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [memoryIndex, setMemoryIndex] = useState(0);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (screen !== "home") return;
+    const timer = setInterval(() => {
+      setMemoryIndex((i) => (i + 1) % sampleMemories.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [screen]);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -116,30 +131,45 @@ export default function Landing() {
     return (
       <div className="min-h-screen flex flex-col bg-background max-w-[430px] mx-auto">
         <div className="flex-1 flex flex-col justify-center px-8">
-          {/* Logo + tagline */}
-          <div className="text-center mb-10">
-            <div className="w-16 h-16 rounded-full bg-[hsl(var(--sage-light))] mx-auto mb-5 flex items-center justify-center">
-              <Sprout className="w-8 h-8 text-primary" />
+          {/* Logo */}
+          <div className="text-center mb-8">
+            <div className="w-14 h-14 rounded-full bg-[hsl(var(--sage-light))] mx-auto mb-4 flex items-center justify-center">
+              <Sprout className="w-7 h-7 text-primary" />
             </div>
-            <h1 className="text-3xl font-serif tracking-tight text-foreground mb-2">
+            <h1 className="text-2xl font-serif tracking-tight text-foreground">
               Memory Garden
             </h1>
-            <p className="text-base text-primary/80 italic font-serif">
-              So they never have to wonder.
-            </p>
           </div>
 
-          {/* Card */}
-          <div className="bg-card rounded-2xl border border-border p-6 mb-8 text-center shadow-sm">
-            <p className="text-sm text-foreground leading-relaxed mb-4">
-              Where everyone who loves them adds to the story of who they are.
-            </p>
-            <div className="flex justify-center gap-3 text-xs font-medium text-primary/70">
-              <span className="bg-primary/5 px-3 py-1.5 rounded-full">Seen</span>
-              <span className="bg-primary/5 px-3 py-1.5 rounded-full">Celebrated</span>
-              <span className="bg-primary/5 px-3 py-1.5 rounded-full">Cherished</span>
+          {/* Rotating memory */}
+          <div className="mb-6 min-h-[140px] flex items-center">
+            <div key={memoryIndex} className="w-full text-center animate-in fade-in duration-500">
+              <p className="text-lg font-serif text-foreground leading-relaxed italic mb-4 px-2">
+                "{sampleMemories[memoryIndex].quote}"
+              </p>
+              <p className="text-sm text-muted-foreground">
+                — {sampleMemories[memoryIndex].from}, <span className="text-primary/70">{sampleMemories[memoryIndex].role}</span>
+              </p>
             </div>
           </div>
+
+          {/* Dots */}
+          <div className="flex justify-center gap-2 mb-8">
+            {sampleMemories.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setMemoryIndex(i)}
+                className={`w-1.5 h-1.5 rounded-full transition-all ${
+                  i === memoryIndex ? "bg-primary w-4" : "bg-border"
+                }`}
+              />
+            ))}
+          </div>
+
+          {/* Tagline */}
+          <p className="text-center text-primary/80 italic font-serif text-base mb-8">
+            So they never have to wonder.
+          </p>
 
           {/* CTA */}
           <div className="space-y-4">
@@ -175,44 +205,27 @@ export default function Landing() {
         </header>
 
         <div className="flex-1 flex flex-col justify-center px-8">
-          <div className="text-center mb-10">
-            <div className="w-16 h-16 rounded-full bg-[hsl(var(--sage-light))] mx-auto mb-4 flex items-center justify-center">
-              <Sprout className="w-8 h-8 text-primary" />
-            </div>
-            <h2 className="text-2xl font-serif mb-2">How will you use Memory Garden?</h2>
-          </div>
+          <h2 className="text-xl font-serif text-center mb-8">I want to...</h2>
 
           <div className="space-y-4">
             {/* Parent card */}
             <button
               onClick={() => { setRole("parent"); setParentType(""); setScreen("signup"); }}
-              className="w-full text-left p-5 rounded-2xl border-2 border-border hover:border-primary/40 transition-all group"
+              className="w-full text-center p-8 rounded-2xl bg-card border border-border shadow-sm hover:shadow-md hover:border-primary/30 transition-all"
             >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-[hsl(var(--sage-light))] flex items-center justify-center shrink-0">
-                  <Heart className="w-6 h-6 text-primary" />
-                </div>
-                <div>
-                  <p className="text-base font-medium text-foreground group-hover:text-primary transition-colors">For Parents</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">Start your child's story — the laughter, the kindness, the little things</p>
-                </div>
-              </div>
+              <Heart className="w-8 h-8 text-primary mx-auto mb-3" />
+              <p className="text-lg font-serif text-foreground mb-1">Start my child's garden</p>
+              <p className="text-xs text-muted-foreground">For parents & family</p>
             </button>
 
             {/* Organization card */}
             <button
               onClick={() => { setRole("organization"); setScreen("signup"); }}
-              className="w-full text-left p-5 rounded-2xl border-2 border-border hover:border-primary/40 transition-all group"
+              className="w-full text-center p-8 rounded-2xl bg-card border border-border shadow-sm hover:shadow-md hover:border-primary/30 transition-all"
             >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-[hsl(var(--sage-light))] flex items-center justify-center shrink-0">
-                  <GraduationCap className="w-6 h-6 text-primary" />
-                </div>
-                <div>
-                  <p className="text-base font-medium text-foreground group-hover:text-primary transition-colors">For Organizations</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">Add to the story — the bravery, the kindness, the moments that build who they become</p>
-                </div>
-              </div>
+              <GraduationCap className="w-8 h-8 text-primary mx-auto mb-3" />
+              <p className="text-lg font-serif text-foreground mb-1">Add to their story</p>
+              <p className="text-xs text-muted-foreground">For schools, coaches, tutors & more</p>
             </button>
           </div>
         </div>
