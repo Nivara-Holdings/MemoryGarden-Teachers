@@ -17,6 +17,7 @@ export default function Landing() {
   const [lastName, setLastName] = useState("");
   const [role, setRole] = useState<Role | null>(null);
   const [schoolName, setSchoolName] = useState("");
+  const [parentType, setParentType] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [resetSuccess, setResetSuccess] = useState(false);
@@ -236,29 +237,40 @@ export default function Landing() {
           
           <div className="space-y-5">
             {/* Role Picker */}
-            <div className="space-y-2">
-              <Label className="text-muted-foreground text-sm">I am a...</Label>
-              <div className="grid grid-cols-2 gap-3">
-                {([
-                  { value: "parent" as Role, label: "Parent" },
-                  { value: "organization" as Role, label: "Organization" },
-                ]).map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => setRole(option.value)}
-                    className={`py-3 rounded-xl border-2 transition-all ${
-                      role === option.value
-                        ? "border-primary bg-primary/5 shadow-sm"
-                        : "border-border hover:border-primary/30"
-                    }`}
-                  >
-                    <span className={`text-sm font-medium ${role === option.value ? "text-primary" : "text-foreground"}`}>
-                      {option.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
+            <div className="grid grid-cols-2 gap-3">
+              {([
+                { value: "parent" as Role, label: "Parent" },
+                { value: "organization" as Role, label: "Organization" },
+              ]).map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => setRole(option.value)}
+                  className={`py-3 rounded-xl border-2 transition-all ${
+                    role === option.value
+                      ? "border-primary bg-primary/5 shadow-sm"
+                      : "border-border hover:border-primary/30"
+                  }`}
+                >
+                  <span className={`text-sm font-medium ${role === option.value ? "text-primary" : "text-foreground"}`}>
+                    {option.label}
+                  </span>
+                </button>
+              ))}
             </div>
+            {role === "parent" && (
+              <div className="space-y-2">
+                <Label className="text-muted-foreground text-sm">Relationship</Label>
+                <select
+                  value={parentType}
+                  onChange={(e) => setParentType(e.target.value)}
+                  className="w-full py-3 px-4 text-base rounded-xl border border-border bg-background text-foreground"
+                >
+                  <option value="">Select...</option>
+                  <option value="mom">Mom</option>
+                  <option value="dad">Dad</option>
+                </select>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
