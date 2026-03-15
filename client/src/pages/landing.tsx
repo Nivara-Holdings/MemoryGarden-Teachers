@@ -6,7 +6,7 @@ import { Sprout, ArrowLeft, Loader2, Heart, GraduationCap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
-type Screen = "home" | "login" | "signup" | "forgot-password";
+type Screen = "home" | "choose-path" | "login" | "signup" | "forgot-password";
 type Role = "parent" | "organization";
 
 export default function Landing() {
@@ -65,7 +65,7 @@ export default function Landing() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email, password, firstName, lastName, role, schoolName: role === "organization" ? schoolName : undefined }),
+        body: JSON.stringify({ email, password, firstName, lastName, role: role === "parent" ? parentType : role, schoolName: role === "organization" ? schoolName : undefined }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -155,7 +155,7 @@ export default function Landing() {
           <Button 
             size="lg" 
             className="w-full py-6 text-base rounded-2xl shadow-md" 
-            onClick={() => setScreen("signup")}
+            onClick={() => setScreen("choose-path")}
           >
             Get Started
           </Button>
@@ -165,6 +165,70 @@ export default function Landing() {
               className="text-primary cursor-pointer hover:underline font-medium" 
               onClick={() => setScreen("login")}
             >
+              Log in
+            </span>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (screen === "choose-path") {
+    return (
+      <div className="min-h-screen flex flex-col bg-background max-w-[430px] mx-auto">
+        <header className="flex items-center gap-4 px-6 py-5">
+          <button onClick={() => setScreen("home")} className="text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+        </header>
+
+        <div className="flex-1 flex flex-col justify-center px-8">
+          <div className="text-center mb-10">
+            <div className="w-16 h-16 rounded-full bg-[hsl(var(--sage-light))] mx-auto mb-4 flex items-center justify-center">
+              <Sprout className="w-8 h-8 text-primary" />
+            </div>
+            <h2 className="text-2xl font-serif mb-2">How will you use Memory Garden?</h2>
+          </div>
+
+          <div className="space-y-4">
+            {/* Parent card */}
+            <button
+              onClick={() => { setRole("parent"); setParentType(""); setScreen("signup"); }}
+              className="w-full text-left p-5 rounded-2xl border-2 border-border hover:border-primary/40 transition-all group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-[hsl(var(--sage-light))] flex items-center justify-center shrink-0">
+                  <Heart className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <p className="text-base font-medium text-foreground group-hover:text-primary transition-colors">For Parents</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">Capture and preserve your child's everyday moments</p>
+                </div>
+              </div>
+            </button>
+
+            {/* Organization card */}
+            <button
+              onClick={() => { setRole("organization"); setScreen("signup"); }}
+              className="w-full text-left p-5 rounded-2xl border-2 border-border hover:border-primary/40 transition-all group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-[hsl(var(--sage-light))] flex items-center justify-center shrink-0">
+                  <GraduationCap className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <p className="text-base font-medium text-foreground group-hover:text-primary transition-colors">For Organizations</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">Share the moments parents would otherwise miss</p>
+                </div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <div className="px-8 pb-10">
+          <p className="text-center text-muted-foreground text-sm">
+            Already have an account?{" "}
+            <span className="text-primary cursor-pointer hover:underline font-medium" onClick={() => setScreen("login")}>
               Log in
             </span>
           </p>
@@ -224,7 +288,7 @@ export default function Landing() {
     return (
       <div className="min-h-screen bg-background max-w-[430px] mx-auto">
         <header className="flex items-center gap-4 px-6 py-5">
-          <button onClick={() => setScreen("home")} className="text-muted-foreground hover:text-foreground transition-colors">
+          <button onClick={() => setScreen("choose-path")} className="text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
         </header>
@@ -233,72 +297,91 @@ export default function Landing() {
             <Sprout className="w-5 h-5 text-primary" />
             <span className="font-serif text-primary text-sm">Memory Garden</span>
           </div>
-          <h2 className="text-2xl font-serif mb-6">Create your garden</h2>
-          
+          <h2 className="text-2xl font-serif mb-6">
+            {role === "parent" ? "Create your garden" : "Set up your organization"}
+          </h2>
+
           <div className="space-y-5">
-            {/* Role Picker */}
-            <div className="grid grid-cols-2 gap-3">
-              {([
-                { value: "parent" as Role, label: "Parent" },
-                { value: "organization" as Role, label: "Organization" },
-              ]).map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => setRole(option.value)}
-                  className={`py-3 rounded-xl border-2 transition-all ${
-                    role === option.value
-                      ? "border-primary bg-primary/5 shadow-sm"
-                      : "border-border hover:border-primary/30"
-                  }`}
-                >
-                  <span className={`text-sm font-medium ${role === option.value ? "text-primary" : "text-foreground"}`}>
-                    {option.label}
-                  </span>
-                </button>
-              ))}
-            </div>
+            {/* Parent signup form */}
             {role === "parent" && (
-              <div className="space-y-2">
-                <Label className="text-muted-foreground text-sm">Relationship</Label>
-                <select
-                  value={parentType}
-                  onChange={(e) => setParentType(e.target.value)}
-                  className="w-full py-3 px-4 text-base rounded-xl border border-border bg-background text-foreground"
-                >
-                  <option value="">Select...</option>
-                  <option value="mom">Mom</option>
-                  <option value="dad">Dad</option>
-                </select>
-              </div>
+              <>
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground text-sm">I am...</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {([
+                      { value: "mom", label: "Mom" },
+                      { value: "dad", label: "Dad" },
+                    ]).map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => setParentType(option.value)}
+                        className={`py-3 rounded-xl border-2 transition-all ${
+                          parentType === option.value
+                            ? "border-primary bg-primary/5 shadow-sm"
+                            : "border-border hover:border-primary/30"
+                        }`}
+                      >
+                        <span className={`text-sm font-medium ${parentType === option.value ? "text-primary" : "text-foreground"}`}>
+                          {option.label}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground text-sm">First name</Label>
+                    <Input type="text" placeholder="First" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="py-5 px-4 text-base rounded-xl" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground text-sm">Last name</Label>
+                    <Input type="text" placeholder="Last" value={lastName} onChange={(e) => setLastName(e.target.value)} className="py-5 px-4 text-base rounded-xl" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground text-sm">Email</Label>
+                  <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="py-5 px-4 text-base rounded-xl" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground text-sm">Password</Label>
+                  <Input type="password" placeholder="Create a password" value={password} onChange={(e) => setPassword(e.target.value)} className="py-5 px-4 text-base rounded-xl" onKeyDown={(e) => e.key === "Enter" && handleRegister()} />
+                </div>
+                <Button onClick={handleRegister} className="w-full py-6 text-base rounded-xl" disabled={isSubmitting || !parentType}>
+                  {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Create Account"}
+                </Button>
+              </>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label className="text-muted-foreground text-sm">First name</Label>
-                <Input type="text" placeholder="First" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="py-5 px-4 text-base rounded-xl" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-muted-foreground text-sm">Last name</Label>
-                <Input type="text" placeholder="Last" value={lastName} onChange={(e) => setLastName(e.target.value)} className="py-5 px-4 text-base rounded-xl" />
-              </div>
-            </div>
+            {/* Organization signup form */}
             {role === "organization" && (
-              <div className="space-y-2">
-                <Label className="text-muted-foreground text-sm">School / Organization</Label>
-                <Input type="text" placeholder="e.g. Camp Sunshine, Lincoln Elementary" value={schoolName} onChange={(e) => setSchoolName(e.target.value)} className="py-5 px-4 text-base rounded-xl" />
-              </div>
+              <>
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground text-sm">Organization name</Label>
+                  <Input type="text" placeholder="e.g. Camp Sunshine, Lincoln Elementary" value={schoolName} onChange={(e) => setSchoolName(e.target.value)} className="py-5 px-4 text-base rounded-xl" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground text-sm">Your first name</Label>
+                    <Input type="text" placeholder="First" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="py-5 px-4 text-base rounded-xl" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground text-sm">Your last name</Label>
+                    <Input type="text" placeholder="Last" value={lastName} onChange={(e) => setLastName(e.target.value)} className="py-5 px-4 text-base rounded-xl" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground text-sm">Email</Label>
+                  <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="py-5 px-4 text-base rounded-xl" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground text-sm">Password</Label>
+                  <Input type="password" placeholder="Create a password" value={password} onChange={(e) => setPassword(e.target.value)} className="py-5 px-4 text-base rounded-xl" onKeyDown={(e) => e.key === "Enter" && handleRegister()} />
+                </div>
+                <Button onClick={handleRegister} className="w-full py-6 text-base rounded-xl" disabled={isSubmitting || !schoolName.trim()}>
+                  {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Create Account"}
+                </Button>
+              </>
             )}
-            <div className="space-y-2">
-              <Label className="text-muted-foreground text-sm">Email</Label>
-              <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="py-5 px-4 text-base rounded-xl" />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-muted-foreground text-sm">Password</Label>
-              <Input type="password" placeholder="Create a password" value={password} onChange={(e) => setPassword(e.target.value)} className="py-5 px-4 text-base rounded-xl" onKeyDown={(e) => e.key === "Enter" && handleRegister()} />
-            </div>
-            <Button onClick={handleRegister} className="w-full py-6 text-base rounded-xl" disabled={isSubmitting || !role}>
-              {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Create Account"}
-            </Button>
             <p className="text-center text-muted-foreground text-sm pt-2">
               Already have an account?{" "}
               <span className="text-primary cursor-pointer hover:underline font-medium" onClick={() => { setScreen("login"); setEmail(""); setPassword(""); }}>
