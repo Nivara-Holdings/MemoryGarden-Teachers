@@ -114,54 +114,52 @@ export default function Landing() {
 
   if (screen === "home") {
     return (
-      <div className="min-h-screen flex flex-col bg-background max-w-[430px] mx-auto relative overflow-hidden">
-        {/* Subtle background circles */}
-        <div className="absolute top-[-60px] right-[-40px] w-48 h-48 rounded-full bg-[hsl(var(--sage-light))] opacity-40" />
-        <div className="absolute bottom-[200px] left-[-60px] w-36 h-36 rounded-full bg-[hsl(var(--sage-light))] opacity-30" />
-
-        <div className="flex-1 flex flex-col justify-center px-8 relative z-10">
-          {/* Logo */}
-          <div className="text-center mb-8">
-            <div className="w-20 h-20 rounded-full bg-[hsl(var(--sage-light))] mx-auto mb-6 flex items-center justify-center">
-              <Sprout className="w-10 h-10 text-primary" />
+      <div className="min-h-screen flex flex-col bg-background max-w-[430px] mx-auto">
+        <div className="flex-1 flex flex-col justify-center px-8">
+          {/* Logo + tagline */}
+          <div className="text-center mb-10">
+            <div className="w-16 h-16 rounded-full bg-[hsl(var(--sage-light))] mx-auto mb-5 flex items-center justify-center">
+              <Sprout className="w-8 h-8 text-primary" />
             </div>
-            <h1 className="text-4xl font-serif tracking-tight text-foreground mb-3">
+            <h1 className="text-3xl font-serif tracking-tight text-foreground mb-2">
               Memory Garden
             </h1>
-            <p className="text-base text-primary/80 italic font-serif mb-3">
+            <p className="text-base text-primary/80 italic font-serif">
               So they never have to wonder.
             </p>
-            <p className="text-sm text-muted-foreground max-w-[280px] mx-auto leading-relaxed">
+          </div>
+
+          {/* Card */}
+          <div className="bg-card rounded-2xl border border-border p-6 mb-8 text-center shadow-sm">
+            <p className="text-sm text-foreground leading-relaxed mb-4">
               Where everyone who loves them adds to the story of who they are.
             </p>
+            <div className="flex justify-center gap-3 text-xs font-medium text-primary/70">
+              <span className="bg-primary/5 px-3 py-1.5 rounded-full">Seen</span>
+              <span className="bg-primary/5 px-3 py-1.5 rounded-full">Celebrated</span>
+              <span className="bg-primary/5 px-3 py-1.5 rounded-full">Remembered</span>
+            </div>
           </div>
 
-          {/* Three words */}
-          <div className="mb-10 flex justify-center gap-6 text-sm text-muted-foreground">
-            <span>Seen.</span>
-            <span>Celebrated.</span>
-            <span>Remembered.</span>
-          </div>
-        </div>
-
-        {/* Bottom CTA */}
-        <div className="px-8 pb-10 relative z-10 space-y-4">
-          <Button 
-            size="lg" 
-            className="w-full py-6 text-base rounded-2xl shadow-md" 
-            onClick={() => setScreen("choose-path")}
-          >
-            Get Started
-          </Button>
-          <p className="text-center text-muted-foreground text-sm">
-            Already have an account?{" "}
-            <span 
-              className="text-primary cursor-pointer hover:underline font-medium" 
-              onClick={() => setScreen("login")}
+          {/* CTA */}
+          <div className="space-y-4">
+            <Button
+              size="lg"
+              className="w-full py-6 text-base rounded-2xl shadow-md"
+              onClick={() => setScreen("choose-path")}
             >
-              Log in
-            </span>
-          </p>
+              Get Started
+            </Button>
+            <p className="text-center text-muted-foreground text-sm">
+              Already have an account?{" "}
+              <span
+                className="text-primary cursor-pointer hover:underline font-medium"
+                onClick={() => setScreen("login")}
+              >
+                Log in
+              </span>
+            </p>
+          </div>
         </div>
       </div>
     );
