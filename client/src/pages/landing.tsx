@@ -9,13 +9,17 @@ import { useQueryClient } from "@tanstack/react-query";
 type Screen = "home" | "choose-path" | "login" | "signup" | "forgot-password";
 type Role = "parent" | "organization";
 
-const cardColors = [
-  { bg: "bg-[hsl(var(--sage-light))]", accent: "text-primary" },
-  { bg: "bg-[hsl(var(--coral))]", accent: "text-[hsl(var(--coral-dark))]" },
-  { bg: "bg-[hsl(var(--peach))]", accent: "text-[hsl(var(--peach-dark))]" },
-  { bg: "bg-[hsl(var(--sky))]", accent: "text-[hsl(var(--sky-dark))]" },
-  { bg: "bg-[hsl(var(--lavender))]", accent: "text-[hsl(var(--lavender-dark))]" },
-];
+const personColors: Record<string, { bg: string; accent: string }> = {
+  "Mom": { bg: "bg-[hsl(var(--sage-light))]", accent: "text-primary" },
+  "Dad": { bg: "bg-[hsl(var(--peach))]", accent: "text-[hsl(var(--peach-dark))]" },
+  "Grandma": { bg: "bg-[hsl(var(--lavender))]", accent: "text-[hsl(var(--lavender-dark))]" },
+  "Coach Dan": { bg: "bg-[hsl(var(--coral))]", accent: "text-[hsl(var(--coral-dark))]" },
+  "Mrs. Patel": { bg: "bg-[hsl(var(--sky))]", accent: "text-[hsl(var(--sky-dark))]" },
+  "Ms. Rivera": { bg: "bg-[hsl(var(--peach))]", accent: "text-[hsl(var(--peach-dark))]" },
+  "Ms. Chen": { bg: "bg-[hsl(var(--coral))]", accent: "text-[hsl(var(--coral-dark))]" },
+  "Mr. Thompson": { bg: "bg-[hsl(var(--sage-light))]", accent: "text-primary" },
+};
+const defaultColor = { bg: "bg-[hsl(var(--sage-light))]", accent: "text-primary" };
 
 const sampleMemories = [
   { quote: "There was a new girl at lunch with nowhere to sit. You moved your tray over without a word. That's who you are.", from: "Mom", date: "Mar 4, 2026", type: "text" as const },
@@ -25,7 +29,8 @@ const sampleMemories = [
   { quote: "You were down to your last sticker — the shiny one you'd been saving all week. You gave it to a kid having a rough day.", from: "Dad", date: "Feb 2, 2026", type: "text" as const },
   { quote: "Someone was being mean to the quiet kid in the back. She stepped in. Nobody asked her to, nobody expected her to.", from: "Ms. Rivera", date: "Dec 11, 2025", type: "text" as const },
   { quote: "The whole room was tense before the test. He cracked a joke — not for attention, just to help everyone breathe.", from: "Ms. Chen", date: "Jan 9, 2026", type: "voice" as const },
-  { quote: "A man at the store stopped me to say you held the door and asked how his day was. He said 'you're raising her right.' I wanted to cry.", from: "Mom", date: "Mar 10, 2026", type: "text" as const },
+  { quote: "She went from struggling with fractions to teaching them to the kid next to her. That's not just improvement — that's generosity.", from: "Mr. Thompson", date: "Feb 25, 2026", type: "text" as const },
+  { quote: "Failed the spelling test on Monday. Asked to retake it Friday. Got every word right. I've never seen a kid want it that bad.", from: "Mrs. Patel", date: "Mar 1, 2026", type: "text" as const },
 ];
 
 export default function Landing() {
@@ -149,20 +154,23 @@ export default function Landing() {
             <div className="w-14 h-14 rounded-full bg-[hsl(var(--sage-light))] mx-auto mb-4 flex items-center justify-center">
               <Sprout className="w-7 h-7 text-primary" />
             </div>
-            <h1 className="text-2xl font-serif tracking-tight text-foreground">
+            <h1 className="text-2xl font-serif tracking-tight text-foreground mb-1">
               Memory Garden
             </h1>
+            <p className="text-sm text-primary/80 italic font-serif">
+              So they never have to wonder.
+            </p>
           </div>
 
           {/* Rotating memory card */}
-          <div className="mb-6 min-h-[200px] flex items-center">
+          <div className="mb-6 min-h-[240px] flex items-center">
             <div
               key={memoryIndex}
-              className={`w-full rounded-2xl p-5 animate-in fade-in duration-500 ${cardColors[memoryIndex % cardColors.length].bg}`}
+              className={`w-full rounded-2xl p-6 shadow-sm animate-in fade-in duration-500 ${(personColors[sampleMemories[memoryIndex].from] || defaultColor).bg}`}
             >
               {/* Header: from + date */}
               <div className="flex items-center justify-between mb-3">
-                <span className={`text-sm font-medium ${cardColors[memoryIndex % cardColors.length].accent}`}>
+                <span className={`text-sm font-medium ${(personColors[sampleMemories[memoryIndex].from] || defaultColor).accent}`}>
                   {sampleMemories[memoryIndex].from}
                 </span>
                 <span className="text-xs text-muted-foreground/70">
@@ -173,7 +181,7 @@ export default function Landing() {
               {/* Voice memo waveform (for voice type) */}
               {sampleMemories[memoryIndex].type === "voice" && (
                 <div className="flex items-center gap-3 mb-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${cardColors[memoryIndex % cardColors.length].accent} bg-white/40`}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${(personColors[sampleMemories[memoryIndex].from] || defaultColor).accent} bg-white/40`}>
                     <Play className="w-4 h-4 ml-0.5" />
                   </div>
                   <div className="flex-1 flex items-center gap-[3px] h-8">
@@ -185,7 +193,7 @@ export default function Landing() {
                       />
                     ))}
                   </div>
-                  <span className={`text-xs ${cardColors[memoryIndex % cardColors.length].accent} opacity-70`}>0:12</span>
+                  <span className={`text-xs ${(personColors[sampleMemories[memoryIndex].from] || defaultColor).accent} opacity-70`}>0:12</span>
                 </div>
               )}
 
@@ -208,11 +216,6 @@ export default function Landing() {
               />
             ))}
           </div>
-
-          {/* Tagline */}
-          <p className="text-center text-primary/80 italic font-serif text-base mb-8">
-            So they never have to wonder.
-          </p>
 
           {/* CTA */}
           <div className="space-y-4">
