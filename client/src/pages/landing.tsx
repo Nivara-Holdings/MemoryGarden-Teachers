@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Sprout, ArrowLeft, Loader2, Heart, GraduationCap } from "lucide-react";
+import { Sprout, ArrowLeft, Loader2, Heart, GraduationCap, Mic, Play } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -18,14 +18,14 @@ const cardColors = [
 ];
 
 const sampleMemories = [
-  { quote: "There was a new girl at lunch with nowhere to sit. You moved your tray over without a word. That's who you are.", from: "Mom", role: "Mom" },
-  { quote: "Lost the race. Dead last. Walked up to the winner and said 'that was awesome.' This kid, man.", from: "Coach Dan", role: "Coach" },
-  { quote: "I overheard you tell your crying friend: 'you're not alone, I'm right here.' You're six years old and you already know how to love.", from: "Grandma", role: "Grandma" },
-  { quote: "Wrong answer. Whole class watching. Big breath. Hand goes right back up. That's not something you can teach.", from: "Mrs. Patel", role: "Teacher" },
-  { quote: "You were down to your last sticker — the shiny one you'd been saving all week. You gave it to a kid having a rough day.", from: "Dad", role: "Dad" },
-  { quote: "Someone was being mean to the quiet kid in the back. She stepped in. Nobody asked her to, nobody expected her to.", from: "Ms. Rivera", role: "Teacher" },
-  { quote: "The whole room was tense before the test. He cracked a joke — not for attention, just to help everyone breathe.", from: "Ms. Chen", role: "Teacher" },
-  { quote: "A man at the store stopped me to say you held the door and asked how his day was. He said 'you're raising her right.' I wanted to cry.", from: "Mom", role: "Mom" },
+  { quote: "There was a new girl at lunch with nowhere to sit. You moved your tray over without a word. That's who you are.", from: "Mom", date: "Mar 4, 2026", type: "text" as const },
+  { quote: "Lost the race. Dead last. Walked up to the winner and said 'that was awesome.' This kid, man.", from: "Coach Dan", date: "Feb 18, 2026", type: "text" as const },
+  { quote: "I overheard you tell your crying friend: 'you're not alone, I'm right here.' You're six years old and you already know how to love.", from: "Grandma", date: "Jan 22, 2026", type: "voice" as const },
+  { quote: "Wrong answer. Whole class watching. Big breath. Hand goes right back up. That's not something you can teach.", from: "Mrs. Patel", date: "Mar 7, 2026", type: "text" as const },
+  { quote: "You were down to your last sticker — the shiny one you'd been saving all week. You gave it to a kid having a rough day.", from: "Dad", date: "Feb 2, 2026", type: "text" as const },
+  { quote: "Someone was being mean to the quiet kid in the back. She stepped in. Nobody asked her to, nobody expected her to.", from: "Ms. Rivera", date: "Dec 11, 2025", type: "text" as const },
+  { quote: "The whole room was tense before the test. He cracked a joke — not for attention, just to help everyone breathe.", from: "Ms. Chen", date: "Jan 9, 2026", type: "voice" as const },
+  { quote: "A man at the store stopped me to say you held the door and asked how his day was. He said 'you're raising her right.' I wanted to cry.", from: "Mom", date: "Mar 10, 2026", type: "text" as const },
 ];
 
 export default function Landing() {
@@ -155,17 +155,43 @@ export default function Landing() {
           </div>
 
           {/* Rotating memory card */}
-          <div className="mb-6 min-h-[180px] flex items-center">
+          <div className="mb-6 min-h-[200px] flex items-center">
             <div
               key={memoryIndex}
-              className={`w-full rounded-2xl p-6 animate-in fade-in duration-500 ${sampleMemories[memoryIndex].bg}`}
+              className={`w-full rounded-2xl p-5 animate-in fade-in duration-500 ${cardColors[memoryIndex % cardColors.length].bg}`}
             >
-              <p className="text-base font-serif text-foreground/90 leading-relaxed italic mb-4">
+              {/* Header: from + date */}
+              <div className="flex items-center justify-between mb-3">
+                <span className={`text-sm font-medium ${cardColors[memoryIndex % cardColors.length].accent}`}>
+                  {sampleMemories[memoryIndex].from}
+                </span>
+                <span className="text-xs text-muted-foreground/70">
+                  {sampleMemories[memoryIndex].date}
+                </span>
+              </div>
+
+              {/* Voice memo waveform (for voice type) */}
+              {sampleMemories[memoryIndex].type === "voice" && (
+                <div className="flex items-center gap-3 mb-3">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${cardColors[memoryIndex % cardColors.length].accent} bg-white/40`}>
+                    <Play className="w-4 h-4 ml-0.5" />
+                  </div>
+                  <div className="flex-1 flex items-center gap-[3px] h-8">
+                    {[20, 35, 25, 40, 30, 45, 35, 25, 40, 30, 35, 45, 25, 40, 35, 30, 45, 25, 35, 20].map((h, i) => (
+                      <div
+                        key={i}
+                        className="w-1 rounded-full opacity-40"
+                        style={{ height: `${h * 0.6}px`, backgroundColor: "currentColor" }}
+                      />
+                    ))}
+                  </div>
+                  <span className={`text-xs ${cardColors[memoryIndex % cardColors.length].accent} opacity-70`}>0:12</span>
+                </div>
+              )}
+
+              {/* Quote */}
+              <p className="text-[15px] font-serif text-foreground/90 leading-relaxed italic">
                 "{sampleMemories[memoryIndex].quote}"
-              </p>
-              <p className={`text-sm font-medium ${sampleMemories[memoryIndex].accent}`}>
-                — {sampleMemories[memoryIndex].from}
-                <span className="font-normal opacity-70 ml-1">· {sampleMemories[memoryIndex].role}</span>
               </p>
             </div>
           </div>
