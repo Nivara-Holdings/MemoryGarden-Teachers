@@ -9,6 +9,14 @@ import { useQueryClient } from "@tanstack/react-query";
 type Screen = "home" | "choose-path" | "login" | "signup" | "forgot-password";
 type Role = "parent" | "organization";
 
+const cardColors = [
+  { bg: "bg-[hsl(var(--sage-light))]", accent: "text-primary" },
+  { bg: "bg-[hsl(var(--coral))]", accent: "text-[hsl(var(--coral-dark))]" },
+  { bg: "bg-[hsl(var(--peach))]", accent: "text-[hsl(var(--peach-dark))]" },
+  { bg: "bg-[hsl(var(--sky))]", accent: "text-[hsl(var(--sky-dark))]" },
+  { bg: "bg-[hsl(var(--lavender))]", accent: "text-[hsl(var(--lavender-dark))]" },
+];
+
 const sampleMemories = [
   { quote: "There was a new girl at lunch with nowhere to sit. You moved your tray over without a word. That's who you are.", from: "Mom", role: "Mom" },
   { quote: "Lost the race. Dead last. Walked up to the winner and said 'that was awesome.' This kid, man.", from: "Coach Dan", role: "Coach" },
@@ -146,14 +154,18 @@ export default function Landing() {
             </h1>
           </div>
 
-          {/* Rotating memory */}
-          <div className="mb-6 min-h-[140px] flex items-center">
-            <div key={memoryIndex} className="w-full text-center animate-in fade-in duration-500">
-              <p className="text-lg font-serif text-foreground leading-relaxed italic mb-4 px-2">
+          {/* Rotating memory card */}
+          <div className="mb-6 min-h-[180px] flex items-center">
+            <div
+              key={memoryIndex}
+              className={`w-full rounded-2xl p-6 animate-in fade-in duration-500 ${sampleMemories[memoryIndex].bg}`}
+            >
+              <p className="text-base font-serif text-foreground/90 leading-relaxed italic mb-4">
                 "{sampleMemories[memoryIndex].quote}"
               </p>
-              <p className="text-sm text-muted-foreground">
-                — {sampleMemories[memoryIndex].from}, <span className="text-primary/70">{sampleMemories[memoryIndex].role}</span>
+              <p className={`text-sm font-medium ${sampleMemories[memoryIndex].accent}`}>
+                — {sampleMemories[memoryIndex].from}
+                <span className="font-normal opacity-70 ml-1">· {sampleMemories[memoryIndex].role}</span>
               </p>
             </div>
           </div>
