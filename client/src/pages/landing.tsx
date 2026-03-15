@@ -137,7 +137,7 @@ export default function Landing() {
             <div className="flex justify-center gap-3 text-xs font-medium text-primary/70">
               <span className="bg-primary/5 px-3 py-1.5 rounded-full">Seen</span>
               <span className="bg-primary/5 px-3 py-1.5 rounded-full">Celebrated</span>
-              <span className="bg-primary/5 px-3 py-1.5 rounded-full">Remembered</span>
+              <span className="bg-primary/5 px-3 py-1.5 rounded-full">Cherished</span>
             </div>
           </div>
 
